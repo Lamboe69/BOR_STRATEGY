@@ -2,7 +2,7 @@
   "connected": true,
   "account": 435616885,
   "balance": 6235.07,
-  "equity": 6187.1,
+  "equity": 6222.47,
   "currency": "USD",
   "server": "Exness-MT5Trial9",
   "symbols": [
@@ -11,7 +11,7 @@
     "USTECm",
     "USOILm"
   ],
-  "last_update": "2026-04-30 15:22:43",
+  "last_update": "2026-04-30 15:25:59",
   "sessions": {
     "tokyo": {
       "active": false,
@@ -39,8 +39,8 @@
       "tp": 27875.27,
       "lot": 3.23,
       "time": "2026-04-30 15:15",
-      "pnl": -47.97,
-      "current_price": 27280.91
+      "pnl": -12.6,
+      "current_price": 27291.86
     }
   ],
   "trade_history": [

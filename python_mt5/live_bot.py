@@ -170,44 +170,29 @@ def calc_lot(symbol: str, entry: float, sl: float) -> float:
         log.warning("SL distance is zero for %s", symbol)
         return sym_info.volume_min
     
-    # Get tick size (minimum price movement)
+    # Get tick size and tick value
     tick_size = sym_info.trade_tick_size
+    tick_value = sym_info.trade_tick_value
     
     # Calculate how many ticks in the SL distance
     ticks_in_sl = sl_distance / tick_size
     
-    # Get tick value - for forex, calculate it properly
-    tick_value = sym_info.trade_tick_value
-    
-    # For forex pairs (contract size = 100,000), tick_value might be in quote currency
-    # We need to convert to account currency (USD)
-    # Check if this is a forex pair
+    # Check if this is a forex pair (contract size = 100,000)
     is_forex = sym_info.trade_contract_size == 100000.0
     
     if is_forex:
         # For forex, calculate pip value properly
-        # 1 pip = 0.0001 for most pairs (or 0.01 for JPY pairs)
-        # Pip value = (1 pip / exchange rate) × lot size
-        # For 1 standard lot (100,000 units): pip value = 10 USD for EURUSD
-        
-        # Get current price to calculate pip value
         tick = mt5.symbol_info_tick(symbol)
         if tick:
             current_price = (tick.ask + tick.bid) / 2
         else:
             current_price = entry
         
-        # Check if this is a JPY pair (2 decimal places)
+        # Check if this is a JPY pair (2-3 decimal places)
         if sym_info.digits == 3 or sym_info.digits == 2:
-            # JPY pairs: 1 pip = 0.01
             pip_size = 0.01
         else:
-            # Standard pairs: 1 pip = 0.0001
             pip_size = 0.0001
-        
-        # Calculate pip value for 1 standard lot in account currency
-        # For XXXUSD pairs: pip_value = pip_size × contract_size = 0.0001 × 100,000 = $10
-        # For USDXXX pairs: pip_value = (pip_size × contract_size) / current_price
         
         symbol_upper = symbol.upper()
         if 'USD' in symbol_upper:
@@ -228,11 +213,29 @@ def calc_lot(symbol: str, entry: float, sl: float) -> float:
         log.info("%s lot calc: risk=$%.2f sl_dist=%.5f pips=%.2f pip_val=$%.2f → lot=%.2f",
                  symbol, risk_usd, sl_distance, pips_in_sl, pip_value_per_lot, lot)
     else:
-        # For indices/commodities, use tick value directly
-        lot = risk_usd / (ticks_in_sl * tick_value)
+        # For indices/commodities, use point value calculation
+        # Point value = tick_value / tick_size (value per 1.0 price movement)
+        point_value = tick_value / tick_size if tick_size > 0 else tick_value
         
-        log.info("%s lot calc: risk=$%.2f sl_dist=%.5f ticks=%.2f tick_val=%.5f → lot=%.2f",
-                 symbol, risk_usd, sl_distance, ticks_in_sl, tick_value, lot)
+        # For USTEC/NAS100: typical values are
+        # tick_size = 0.01, tick_value = 0.01 USD per contract
+        # So point_value = 0.01 / 0.01 = 1.0 USD per point per contract
+        # But we need to account for contract size
+        
+        # Get contract size (for indices, this is usually 1)
+        contract_size = sym_info.trade_contract_size
+        
+        # Calculate value per point for 1 lot
+        # For USTEC: 1 lot = 1 contract, 1 point = $1
+        value_per_point = point_value * contract_size
+        
+        # Calculate lot size
+        # risk_usd = lot × sl_distance × value_per_point
+        # lot = risk_usd / (sl_distance × value_per_point)
+        lot = risk_usd / (sl_distance * value_per_point)
+        
+        log.info("%s lot calc: risk=$%.2f sl_dist=%.2f tick_size=%.5f tick_val=%.5f contract_size=%.2f point_val=%.5f → lot=%.2f",
+                 symbol, risk_usd, sl_distance, tick_size, tick_value, contract_size, value_per_point, lot)
     
     # Round to broker's volume step and clamp to min/max
     lot = round(lot / sym_info.volume_step) * sym_info.volume_step
