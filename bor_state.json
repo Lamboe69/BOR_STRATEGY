@@ -1,8 +1,8 @@
 {
   "connected": true,
   "account": 435616885,
-  "balance": 6235.07,
-  "equity": 6110.67,
+  "balance": 6231.48,
+  "equity": 6015.36,
   "currency": "USD",
   "server": "Exness-MT5Trial9",
   "symbols": [
@@ -11,7 +11,7 @@
     "USTECm",
     "USOILm"
   ],
-  "last_update": "2026-04-30 16:18:07",
+  "last_update": "2026-04-30 16:35:17",
   "sessions": {
     "tokyo": {
       "active": false,
@@ -24,8 +24,8 @@
       "active": true,
       "wins": 0,
       "losses": 8,
-      "trades": 0,
-      "levels": "XAUUSDm: S1:4625.52500 S2:4617.04600 S3:4613.23600 S4:4611.24800\nUS30m: S1:49639.70000 S2:49556.70000 S3:49521.40000 S4:49517.10000\nUSTECm: S1:27325.25000 S2:27312.06000 S3:27243.93000 S4:27222.73000\nUSOILm: S1:101.84200 S2:101.68000 S3:100.98600 S4:100.68000"
+      "trades": 1,
+      "levels": "XAUUSDm: S1:4617.43200 S2:4617.04600 S3:4611.24800 S4:4609.77500\nUS30m: S1:49653.70000 S2:49639.70000 S3:49614.60000 S4:49521.40000\nUSTECm: S1:27323.59000 S2:27312.06000 S3:27249.32000 S4:27222.73000\nUSOILm: S1:101.84200 S2:101.60500 S3:101.06800 S4:100.98600"
     }
   },
   "open_trades": [
@@ -39,8 +39,8 @@
       "tp": 27875.27,
       "lot": 3.23,
       "time": "2026-04-30 15:15",
-      "pnl": 38.31,
-      "current_price": 27307.62
+      "pnl": 25.03,
+      "current_price": 27303.51
     },
     {
       "ticket": 2695068982,
@@ -52,8 +52,8 @@
       "tp": 97.924,
       "lot": 0.53,
       "time": "2026-04-30 15:30",
-      "pnl": -162.71,
-      "current_price": 101.557
+      "pnl": -241.15,
+      "current_price": 101.705
     }
   ],
   "trade_history": [
@@ -601,21 +601,42 @@
       "close_price": 102.559,
       "actual_pnl": -701.68,
       "closed_at": "2026-04-30T14:45:09.112931"
+    },
+    {
+      "ticket": 2695328860,
+      "symbol": "XAUUSDm",
+      "direction": "sell",
+      "session": "london",
+      "entry": 4609.775,
+      "sl": 4611.248,
+      "tp": 4595.045,
+      "lot": 0.01,
+      "time": "2026-04-30 16:15",
+      "pnl": 0.0,
+      "close_reason": "sl"
     }
   ],
   "logs": [
-    "2026-04-30 19:11:21,468  INFO      Connected \u2014 account 435616885  balance 6235.07 USD",
-    "2026-04-30 19:11:21,469  INFO      Restored position 2694998272 from database: USTECm BUY in LONDON session",
-    "2026-04-30 19:11:21,470  INFO      Restored position 2695068982 from database: USOILm SELL in LONDON session",
-    "2026-04-30 19:11:21,470  INFO      BOR Bot started \u2014 symbols: ['XAUUSDm', 'US30m', 'USTECm', 'USOILm']",
-    "2026-04-30 19:11:21,470  INFO      Loaded 34 closed trades from database",
-    "2026-04-30 19:11:21,471  INFO      XAUUSDm session stats loaded: Tokyo W/L/T=0/0/0, London W/L/T=0/3/0",
-    "2026-04-30 19:11:21,471  INFO      US30m session stats loaded: Tokyo W/L/T=0/0/0, London W/L/T=0/2/1",
-    "2026-04-30 19:11:21,471  INFO      USTECm session stats loaded: Tokyo W/L/T=0/1/0, London W/L/T=0/2/1",
-    "2026-04-30 19:11:21,471  INFO      USOILm session stats loaded: Tokyo W/L/T=0/0/0, London W/L/T=0/1/2",
-    "2026-04-30 19:11:21,520  INFO      XAUUSDm: New London session detected - trade_count reset to 0",
-    "2026-04-30 19:11:21,524  INFO      US30m: New London session detected - trade_count reset to 0",
-    "2026-04-30 19:11:21,527  INFO      USTECm: New London session detected - trade_count reset to 0",
-    "2026-04-30 19:11:21,532  INFO      USOILm: New London session detected - trade_count reset to 0"
+    "2026-04-30 19:24:41,687  INFO      Connected \u2014 account 435616885  balance 6235.07 USD",
+    "2026-04-30 19:24:41,687  INFO      Restored position 2694998272 from database: USTECm BUY in LONDON session",
+    "2026-04-30 19:24:41,688  INFO      Restored position 2695068982 from database: USOILm SELL in LONDON session",
+    "2026-04-30 19:24:41,689  INFO      BOR Bot started \u2014 symbols: ['XAUUSDm', 'US30m', 'USTECm', 'USOILm']",
+    "2026-04-30 19:24:41,689  INFO      Loaded 34 closed trades from database",
+    "2026-04-30 19:24:41,689  INFO      XAUUSDm session stats loaded: Tokyo W/L/T=0/0/0, London W/L/T=0/3/0",
+    "2026-04-30 19:24:41,689  INFO      US30m session stats loaded: Tokyo W/L/T=0/0/0, London W/L/T=0/2/0",
+    "2026-04-30 19:24:41,689  INFO      USTECm session stats loaded: Tokyo W/L/T=0/1/0, London W/L/T=0/2/0",
+    "2026-04-30 19:24:41,689  INFO      USOILm session stats loaded: Tokyo W/L/T=0/0/0, London W/L/T=0/1/0",
+    "2026-04-30 19:24:41,692  INFO      XAUUSDm: New London session detected - trade_count reset to 0",
+    "2026-04-30 19:24:41,696  INFO      US30m: New London session detected - trade_count reset to 0",
+    "2026-04-30 19:24:41,701  INFO      USTECm: New London session detected - trade_count reset to 0",
+    "2026-04-30 19:24:41,705  INFO      USOILm: New London session detected - trade_count reset to 0",
+    "2026-04-30 19:30:00,430  INFO      XAUUSDm lot calc: risk=$200.00 sl_dist=1.47 tick_size=0.00100 tick_val=0.10000 contract_size=100.00 point_val=10000.00000 \u2192 lot=0.01",
+    "2026-04-30 19:30:01,924  INFO      MARKET order placed (TP coverage 13.4% \u2264 20%)  XAUUSDm SELL  lot=0.01  entry=4609.77500  SL=4611.24800  TP=4595.04500  R/R=1:10.0  ticket=2695328860",
+    "2026-04-30 19:30:01,994  INFO      XAUUSDm: Trade count incremented for LONDON session: 1/2",
+    "2026-04-30 19:30:01,994  INFO      Trade opened in LONDON session: XAUUSDm SELL",
+    "2026-04-30 19:33:12,665  INFO      Position 2695328860: Found OUT deal with close price 4611.24800",
+    "2026-04-30 19:33:12,665  INFO      Position 2695328860: close=4611.24800 tp=4595.04500 (diff=16.20300) sl=4611.24800 (diff=0.00000) tolerance=1.00000",
+    "2026-04-30 19:33:12,665  INFO      Position 2695328860: Actual P&L from MT5 deals = $-3.59",
+    "2026-04-30 19:33:12,665  INFO      Position 2695328860 closed at 4611.24800 by SL - XAUUSDm"
   ]
 }

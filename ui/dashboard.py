@@ -7,7 +7,7 @@ Run:
     python ui/dashboard.py
 """
 
-import json, sys, subprocess, signal, webbrowser, threading, os, hashlib, secrets
+import json, sys, subprocess, signal, webbrowser, threading, os, hashlib, secrets, datetime
 from pathlib import Path
 from flask import Flask, render_template, jsonify, request, redirect, url_for, session
 from functools import wraps
@@ -61,6 +61,16 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated
 
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("logged_in"):
+            return redirect(url_for("login_page"))
+        if session.get("role") != "admin":
+            return jsonify({"ok": False, "msg": "Admin access required"}), 403
+        return f(*args, **kwargs)
+    return decorated
+
 
 # ── routes ────────────────────────────────────────────────────────────────────
 
@@ -84,16 +94,23 @@ def auth_register():
     
     users_data = _load_users()
     
+    # SECURITY: Only allow registration if NO users exist (first-time setup)
+    if len(users_data["users"]) > 0:
+        return jsonify({"ok": False, "msg": "Registration is disabled. Contact the administrator."}), 403
+    
     if any(u["username"] == username for u in users_data["users"]):
         return jsonify({"ok": False, "msg": "Username already exists"}), 400
     
+    # First user is automatically admin with full access
     users_data["users"].append({
         "username": username,
-        "password": _hash_password(password)
+        "password": _hash_password(password),
+        "role": "admin",
+        "created_at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     })
     _save_users(users_data)
     
-    return jsonify({"ok": True, "msg": "Account created successfully"})
+    return jsonify({"ok": True, "msg": "Admin account created successfully"})
 
 @app.route("/auth/login", methods=["POST"])
 def auth_login():
@@ -107,6 +124,7 @@ def auth_login():
     if user and user["password"] == _hash_password(password):
         session["logged_in"] = True
         session["username"] = username
+        session["role"] = user.get("role", "viewer")  # admin or viewer
         return jsonify({"ok": True})
     
     return jsonify({"ok": False, "msg": "Invalid username or password"}), 401
@@ -135,7 +153,7 @@ def settings_page():
 
 
 @app.route("/settings", methods=["POST"])
-@login_required
+@admin_required
 def settings_save():
     data = request.get_json(force=True)
     
@@ -352,7 +370,7 @@ def performance_symbol(symbol):
 
 
 @app.route("/bot/start", methods=["POST"])
-@login_required
+@admin_required
 def bot_start():
     global _bot_process
     if _bot_running():
@@ -368,7 +386,7 @@ def bot_start():
 
 
 @app.route("/bot/stop", methods=["POST"])
-@login_required
+@admin_required
 def bot_stop():
     global _bot_process
     if not _bot_running():

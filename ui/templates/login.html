@@ -376,10 +376,15 @@
         const data = await res.json();
 
         if (data.ok) {
-          showMessage('✅ Account created! You can now login.', false);
+          showMessage('✅ Admin account created! You can now login.', false);
           setTimeout(() => switchTab('login'), 1500);
         } else {
-          showMessage('❌ ' + (data.msg || 'Registration failed'), true);
+          if (res.status === 403) {
+            showMessage('🔒 Registration is disabled. Only the owner can access this system.', true);
+            setTimeout(() => switchTab('login'), 2000);
+          } else {
+            showMessage('❌ ' + (data.msg || 'Registration failed'), true);
+          }
         }
       } catch (err) {
         showMessage('❌ Connection error. Please try again.', true);

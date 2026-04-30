@@ -572,6 +572,23 @@
       "close_price": 102.559,
       "actual_pnl": -701.68,
       "closed_at": "2026-04-30T14:45:09.112931"
+    },
+    {
+      "ticket": 2695328860,
+      "symbol": "XAUUSDm",
+      "direction": "sell",
+      "session": "london",
+      "entry": 4609.775,
+      "sl": 4611.248,
+      "tp": 4595.045,
+      "lot": 0.01,
+      "time": "2026-04-30 16:15",
+      "pnl": 0.0,
+      "last_updated": "2026-04-30T16:30:02.400576",
+      "close_reason": "sl",
+      "close_price": 4611.248,
+      "actual_pnl": -3.59,
+      "closed_at": "2026-04-30T16:33:12.665962"
     }
   ],
   "version": "1.0",
@@ -583,8 +600,8 @@
       },
       "london": {
         "wins": 0,
-        "losses": 3,
-        "trade_count": 0
+        "losses": 4,
+        "trade_count": 1
       }
     },
     "US30m": {
