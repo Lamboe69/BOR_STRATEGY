@@ -178,7 +178,10 @@ def calc_lot(symbol: str, entry: float, sl: float) -> float:
     ticks_in_sl = sl_distance / tick_size
     
     # Check if this is a forex pair (contract size = 100,000)
-    is_forex = sym_info.trade_contract_size == 100000.0
+    # Exclude commodities like USOIL, UKOIL even if they have 100k contract size
+    symbol_upper = symbol.upper()
+    is_commodity = any(x in symbol_upper for x in ['OIL', 'XAU', 'GOLD', 'XAG', 'SILVER', 'US30', 'USTEC', 'NAS', 'DOW'])
+    is_forex = sym_info.trade_contract_size == 100000.0 and not is_commodity
     
     if is_forex:
         # For forex, calculate pip value properly

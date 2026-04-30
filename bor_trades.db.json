@@ -12,6 +12,19 @@
       "time": "2026-04-30 15:00",
       "pnl": 0.0,
       "last_updated": "2026-04-30T15:15:00.295257"
+    },
+    "2695068982": {
+      "ticket": 2695068982,
+      "symbol": "USOILm",
+      "direction": "sell",
+      "session": "london",
+      "entry": 101.684,
+      "sl": 102.06,
+      "tp": 97.924,
+      "lot": 0.53,
+      "time": "2026-04-30 15:15",
+      "pnl": 0.0,
+      "last_updated": "2026-04-30T15:30:01.326425"
     }
   },
   "closed_trades": [
@@ -582,7 +595,7 @@
       "london": {
         "wins": 0,
         "losses": 2,
-        "trade_count": 1
+        "trade_count": 0
       }
     },
     "USTECm": {
@@ -593,7 +606,7 @@
       "london": {
         "wins": 0,
         "losses": 2,
-        "trade_count": 1
+        "trade_count": 0
       }
     },
     "USOILm": {
@@ -605,7 +618,7 @@
       "london": {
         "wins": 0,
         "losses": 1,
-        "trade_count": 1
+        "trade_count": 0
       }
     }
   }
