@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#a855f7">
+  <title>BOR Bot — Login</title>
+  <link rel="manifest" href="/static/manifest.json">
+  <link rel="icon" type="image/png" href="/static/icon-192.png">
+  <link rel="apple-touch-icon" href="/static/icon-192.png">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      color: #e0e7ff;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 400px;
+      background: rgba(20, 20, 35, 0.95);
+      backdrop-filter: blur(20px);
+      border-radius: 24px;
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      padding: 40px 30px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    }
+
+    .logo {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .logo-icon {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 15px;
+      background: linear-gradient(135deg, #a855f7, #3b82f6);
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 36px;
+      font-weight: 800;
+      color: white;
+      box-shadow: 0 10px 30px rgba(168, 85, 247, 0.4);
+    }
+
+    .logo h1 {
+      font-size: 28px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #a855f7, #3b82f6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 5px;
+    }
+
+    .logo p {
+      font-size: 13px;
+      color: #a5b4fc;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 30px;
+      background: rgba(10, 10, 15, 0.6);
+      padding: 5px;
+      border-radius: 12px;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      background: transparent;
+      color: #a5b4fc;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .tab.active {
+      background: linear-gradient(135deg, #a855f7, #3b82f6);
+      color: white;
+      box-shadow: 0 4px 15px rgba(168, 85, 247, 0.4);
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #a5b4fc;
+      margin-bottom: 8px;
+    }
+
+    input {
+      width: 100%;
+      padding: 14px 16px;
+      border-radius: 12px;
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      background: rgba(10, 10, 15, 0.8);
+      color: #e0e7ff;
+      font-size: 15px;
+      outline: none;
+      transition: all 0.3s ease;
+    }
+
+    input:focus {
+      border-color: #a855f7;
+      box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.15);
+      background: rgba(20, 20, 35, 0.95);
+    }
+
+    .btn {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #a855f7, #3b82f6);
+      color: white;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 8px 25px rgba(168, 85, 247, 0.4);
+      margin-top: 10px;
+    }
+
+    .btn:active {
+      transform: translateY(2px);
+      box-shadow: 0 4px 15px rgba(168, 85, 247, 0.3);
+    }
+
+    .message {
+      padding: 12px 16px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      font-weight: 500;
+      display: none;
+    }
+
+    .message.success {
+      background: rgba(52, 211, 153, 0.15);
+      border: 1px solid rgba(52, 211, 153, 0.5);
+      color: #34d399;
+    }
+
+    .message.error {
+      background: rgba(248, 113, 113, 0.15);
+      border: 1px solid rgba(248, 113, 113, 0.5);
+      color: #f87171;
+    }
+
+    .install-prompt {
+      margin-top: 20px;
+      padding: 16px;
+      background: rgba(168, 85, 247, 0.1);
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      border-radius: 12px;
+      text-align: center;
+      display: none;
+    }
+
+    .install-prompt p {
+      font-size: 13px;
+      color: #a5b4fc;
+      margin-bottom: 12px;
+    }
+
+    .install-btn {
+      padding: 10px 20px;
+      background: rgba(168, 85, 247, 0.2);
+      border: 1px solid #a855f7;
+      border-radius: 8px;
+      color: #a855f7;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .install-btn:active {
+      transform: scale(0.95);
+    }
+
+    @media (max-width: 480px) {
+      .container {
+        padding: 30px 20px;
+      }
+
+      .logo h1 {
+        font-size: 24px;
+      }
+
+      .logo-icon {
+        width: 70px;
+        height: 70px;
+        font-size: 32px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">
+      <div class="logo-icon">B</div>
+      <h1>BOR Strategy</h1>
+      <p>Break-of-Range Trading Bot</p>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('login')">Login</button>
+      <button class="tab" onclick="switchTab('register')">Register</button>
+    </div>
+
+    <div id="message" class="message"></div>
+
+    <!-- Login Form -->
+    <form id="login-form" onsubmit="handleLogin(event)">
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" id="login-username" required autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="login-password" required autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn">Login</button>
+    </form>
+
+    <!-- Register Form -->
+    <form id="register-form" style="display:none;" onsubmit="handleRegister(event)">
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" id="register-username" required autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="register-password" required autocomplete="new-password">
+      </div>
+      <div class="form-group">
+        <label>Confirm Password</label>
+        <input type="password" id="register-confirm" required autocomplete="new-password">
+      </div>
+      <button type="submit" class="btn">Create Account</button>
+    </form>
+
+    <div id="install-prompt" class="install-prompt">
+      <p>📱 Install BOR Bot on your home screen for quick access</p>
+      <button class="install-btn" onclick="installApp()">Install App</button>
+    </div>
+  </div>
+
+  <script>
+    let deferredPrompt;
+
+    // Register service worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/static/sw.js')
+        .then(reg => console.log('Service Worker registered'))
+        .catch(err => console.log('Service Worker registration failed'));
+    }
+
+    // PWA install prompt
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      document.getElementById('install-prompt').style.display = 'block';
+    });
+
+    function installApp() {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choiceResult) => {
+          if (choiceResult.outcome === 'accepted') {
+            document.getElementById('install-prompt').style.display = 'none';
+          }
+          deferredPrompt = null;
+        });
+      }
+    }
+
+    function switchTab(tab) {
+      const tabs = document.querySelectorAll('.tab');
+      tabs.forEach(t => t.classList.remove('active'));
+      
+      if (tab === 'login') {
+        tabs[0].classList.add('active');
+        document.getElementById('login-form').style.display = 'block';
+        document.getElementById('register-form').style.display = 'none';
+      } else {
+        tabs[1].classList.add('active');
+        document.getElementById('login-form').style.display = 'none';
+        document.getElementById('register-form').style.display = 'block';
+      }
+      hideMessage();
+    }
+
+    function showMessage(text, isError = false) {
+      const msg = document.getElementById('message');
+      msg.textContent = text;
+      msg.className = 'message ' + (isError ? 'error' : 'success');
+      msg.style.display = 'block';
+    }
+
+    function hideMessage() {
+      document.getElementById('message').style.display = 'none';
+    }
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      const username = document.getElementById('login-username').value;
+      const password = document.getElementById('login-password').value;
+
+      try {
+        const res = await fetch('/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+
+        if (data.ok) {
+          showMessage('✅ Login successful! Redirecting...', false);
+          setTimeout(() => window.location.href = '/', 1000);
+        } else {
+          showMessage('❌ ' + (data.msg || 'Invalid credentials'), true);
+        }
+      } catch (err) {
+        showMessage('❌ Connection error. Please try again.', true);
+      }
+    }
+
+    async function handleRegister(e) {
+      e.preventDefault();
+      const username = document.getElementById('register-username').value;
+      const password = document.getElementById('register-password').value;
+      const confirm = document.getElementById('register-confirm').value;
+
+      if (password !== confirm) {
+        showMessage('❌ Passwords do not match', true);
+        return;
+      }
+
+      if (password.length < 6) {
+        showMessage('❌ Password must be at least 6 characters', true);
+        return;
+      }
+
+      try {
+        const res = await fetch('/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+
+        if (data.ok) {
+          showMessage('✅ Account created! You can now login.', false);
+          setTimeout(() => switchTab('login'), 1500);
+        } else {
+          showMessage('❌ ' + (data.msg || 'Registration failed'), true);
+        }
+      } catch (err) {
+        showMessage('❌ Connection error. Please try again.', true);
+      }
+    }
+  </script>
+</body>
+</html>

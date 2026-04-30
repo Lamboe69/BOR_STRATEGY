@@ -7,19 +7,22 @@ Run:
     python ui/dashboard.py
 """
 
-import json, sys, subprocess, signal, webbrowser, threading, os
+import json, sys, subprocess, signal, webbrowser, threading, os, hashlib, secrets
 from pathlib import Path
-from flask import Flask, render_template, jsonify, request, redirect, url_for
+from flask import Flask, render_template, jsonify, request, redirect, url_for, session
+from functools import wraps
 
 ROOT          = Path(__file__).resolve().parent.parent
 STATE_FILE    = ROOT / "bor_state.json"
 SETTINGS_FILE = ROOT / "bor_settings.json"
 BOT_SCRIPT    = ROOT / "python_mt5" / "live_bot.py"
 BACKTEST_FILE = ROOT / "bor_backtest.json"
+USERS_FILE    = ROOT / "users.json"
 
 sys.path.insert(0, str(ROOT))
 
 app = Flask(__name__)
+app.secret_key = secrets.token_hex(32)
 
 _bot_process: subprocess.Popen | None = None
 
@@ -38,25 +41,101 @@ def _save_settings(data: dict):
 def _bot_running() -> bool:
     return _bot_process is not None and _bot_process.poll() is None
 
+def _load_users() -> dict:
+    try:
+        return json.loads(USERS_FILE.read_text())
+    except Exception:
+        return {"users": []}
+
+def _save_users(data: dict):
+    USERS_FILE.write_text(json.dumps(data, indent=2))
+
+def _hash_password(password: str) -> str:
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("logged_in"):
+            return redirect(url_for("login_page"))
+        return f(*args, **kwargs)
+    return decorated
+
 
 # ── routes ────────────────────────────────────────────────────────────────────
 
+@app.route("/login")
+def login_page():
+    if session.get("logged_in"):
+        return redirect(url_for("index"))
+    return render_template("login.html")
+
+@app.route("/auth/register", methods=["POST"])
+def auth_register():
+    data = request.get_json(force=True)
+    username = data.get("username", "").strip()
+    password = data.get("password", "")
+    
+    if not username or not password:
+        return jsonify({"ok": False, "msg": "Username and password required"}), 400
+    
+    if len(password) < 6:
+        return jsonify({"ok": False, "msg": "Password must be at least 6 characters"}), 400
+    
+    users_data = _load_users()
+    
+    if any(u["username"] == username for u in users_data["users"]):
+        return jsonify({"ok": False, "msg": "Username already exists"}), 400
+    
+    users_data["users"].append({
+        "username": username,
+        "password": _hash_password(password)
+    })
+    _save_users(users_data)
+    
+    return jsonify({"ok": True, "msg": "Account created successfully"})
+
+@app.route("/auth/login", methods=["POST"])
+def auth_login():
+    data = request.get_json(force=True)
+    username = data.get("username", "").strip()
+    password = data.get("password", "")
+    
+    users_data = _load_users()
+    user = next((u for u in users_data["users"] if u["username"] == username), None)
+    
+    if user and user["password"] == _hash_password(password):
+        session["logged_in"] = True
+        session["username"] = username
+        return jsonify({"ok": True})
+    
+    return jsonify({"ok": False, "msg": "Invalid username or password"}), 401
+
+@app.route("/auth/logout", methods=["POST"])
+def auth_logout():
+    session.clear()
+    return jsonify({"ok": True})
+
 @app.route("/")
+@login_required
 def index():
     return render_template("index.html", active_page="dashboard")
 
 
 @app.route("/performance_page")
+@login_required
 def performance_page():
     return render_template("performance.html", active_page="performance")
 
 
 @app.route("/settings", methods=["GET"])
+@login_required
 def settings_page():
     return render_template("settings.html", settings=_load_settings(), active_page="settings")
 
 
 @app.route("/settings", methods=["POST"])
+@login_required
 def settings_save():
     data = request.get_json(force=True)
     
@@ -137,6 +216,7 @@ def _compute_active_sessions() -> dict:
 
 
 @app.route("/state")
+@login_required
 def state():
     running = _bot_running()
     try:
@@ -174,6 +254,7 @@ def state():
 
 
 @app.route("/performance")
+@login_required
 def performance():
     """Return performance statistics and history for graphing"""
     try:
@@ -185,6 +266,7 @@ def performance():
 
 
 @app.route("/performance/symbol/<symbol>")
+@login_required
 def performance_symbol(symbol):
     """Return performance data for a specific symbol based on ACTUAL closed trade P&L from MT5"""
     try:
@@ -270,6 +352,7 @@ def performance_symbol(symbol):
 
 
 @app.route("/bot/start", methods=["POST"])
+@login_required
 def bot_start():
     global _bot_process
     if _bot_running():
@@ -285,6 +368,7 @@ def bot_start():
 
 
 @app.route("/bot/stop", methods=["POST"])
+@login_required
 def bot_stop():
     global _bot_process
     if not _bot_running():
@@ -310,11 +394,13 @@ def bot_stop():
 
 
 @app.route("/backtest")
+@login_required
 def backtest_page():
     return render_template("backtest.html", active_page="backtest")
 
 
 @app.route("/backtest/symbols")
+@login_required
 def backtest_symbols():
     """Return available symbols from MT5 if reachable, else fall back to settings."""
     cfg = _load_settings()
@@ -341,6 +427,7 @@ def backtest_symbols():
 
 
 @app.route("/backtest/run", methods=["POST"])
+@login_required
 def backtest_run():
     import datetime, random, csv as _csv
     import pytz
@@ -783,6 +870,7 @@ def _actual_win_rate(symbol: str) -> dict:
 
 
 @app.route("/backtest/results")
+@login_required
 def backtest_results():
     try:
         return jsonify(json.loads(BACKTEST_FILE.read_text()) if BACKTEST_FILE.exists() else {})

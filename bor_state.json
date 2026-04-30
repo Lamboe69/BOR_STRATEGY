@@ -2,7 +2,7 @@
   "connected": true,
   "account": 435616885,
   "balance": 6235.07,
-  "equity": 6235.07,
+  "equity": 6187.1,
   "currency": "USD",
   "server": "Exness-MT5Trial9",
   "symbols": [
@@ -11,7 +11,7 @@
     "USTECm",
     "USOILm"
   ],
-  "last_update": "2026-04-30 15:10:39",
+  "last_update": "2026-04-30 15:22:43",
   "sessions": {
     "tokyo": {
       "active": false,
@@ -24,11 +24,25 @@
       "active": true,
       "wins": 0,
       "losses": 8,
-      "trades": 2,
+      "trades": 3,
       "levels": "XAUUSDm: S1:4625.60900 S2:4625.39100 S3:4610.39400 S4:4609.10000\nUS30m: S1:49349.60000 S2:49307.60000 S3:49260.00000 S4:49201.20000\nUSTECm: S1:27255.57000 S2:27193.60000 S3:27095.70000 S4:27093.43000\nUSOILm: S1:102.61000 S2:102.55900 S3:102.06000 S4:101.68400"
     }
   },
-  "open_trades": [],
+  "open_trades": [
+    {
+      "ticket": 2694998272,
+      "symbol": "USTECm",
+      "direction": "buy",
+      "session": "london",
+      "entry": 27295.76,
+      "sl": 27193.6,
+      "tp": 27875.27,
+      "lot": 3.23,
+      "time": "2026-04-30 15:15",
+      "pnl": -47.97,
+      "current_price": 27280.91
+    }
+  ],
   "trade_history": [
     {
       "ticket": 2684769676,
@@ -595,6 +609,10 @@
     "2026-04-30 17:45:09,112  INFO      Position 2694851443: Found OUT deal with close price 102.55900",
     "2026-04-30 17:45:09,112  INFO      Position 2694851443: close=102.55900 tp=103.12000 (diff=0.56100) sl=102.55900 (diff=0.00000) tolerance=0.00100",
     "2026-04-30 17:45:09,112  INFO      Position 2694851443: Actual P&L from MT5 deals = $-701.68",
-    "2026-04-30 17:45:09,112  INFO      Position 2694851443 closed at 102.55900 by SL - USOILm"
+    "2026-04-30 17:45:09,112  INFO      Position 2694851443 closed at 102.55900 by SL - USOILm",
+    "2026-04-30 18:14:59,741  INFO      USTECm lot calc: risk=$200.00 sl_dist=61.97000 ticks=6197.00 tick_val=0.01000 \u2192 lot=3.23",
+    "2026-04-30 18:15:00,226  INFO      MARKET order placed (TP coverage 5.8% \u2264 20%)  USTECm BUY  lot=3.23  entry=27255.57000  SL=27193.60000  TP=27875.27000  R/R=1:10.0  ticket=2694998272",
+    "2026-04-30 18:15:00,231  INFO      USTECm: Trade count incremented for LONDON session: 1/2",
+    "2026-04-30 18:15:00,231  INFO      Trade opened in LONDON session: USTECm BUY"
   ]
 }

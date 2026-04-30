@@ -1,5 +1,19 @@
 {
-  "open_trades": {},
+  "open_trades": {
+    "2694998272": {
+      "ticket": 2694998272,
+      "symbol": "USTECm",
+      "direction": "buy",
+      "session": "london",
+      "entry": 27255.57,
+      "sl": 27193.6,
+      "tp": 27875.27,
+      "lot": 3.23,
+      "time": "2026-04-30 15:00",
+      "pnl": 0.0,
+      "last_updated": "2026-04-30T15:15:00.295257"
+    }
+  },
   "closed_trades": [
     {
       "ticket": 2684769676,
@@ -579,7 +593,7 @@
       "london": {
         "wins": 0,
         "losses": 2,
-        "trade_count": 0
+        "trade_count": 1
       }
     },
     "USOILm": {

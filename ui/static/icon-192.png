@@ -1,0 +1,8 @@
+<svg width="192" height="192" xmlns="http://www.w3.org/2000/svg">
+  <rect width="192" height="192" fill="#0a0a0f"/>
+  <circle cx="96" cy="96" r="70" fill="none" stroke="#a855f7" stroke-width="8"/>
+  <path d="M 60 96 L 96 60 L 132 96 L 96 132 Z" fill="#a855f7" opacity="0.3"/>
+  <path d="M 70 96 L 96 70 L 122 96" fill="none" stroke="#34d399" stroke-width="4" stroke-linecap="round"/>
+  <path d="M 70 96 L 96 122 L 122 96" fill="none" stroke="#f87171" stroke-width="4" stroke-linecap="round"/>
+  <text x="96" y="160" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#e0e7ff" text-anchor="middle">BOR</text>
+</svg>
