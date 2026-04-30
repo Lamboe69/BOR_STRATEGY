@@ -418,18 +418,18 @@ class SymbolBot:
         tky_in = in_session(utc_dt, self.strategy.tokyo.start, self.strategy.tokyo.end)
         ldn_in = in_session(utc_dt, self.strategy.london.start, self.strategy.london.end)
         
-        # Reset trade_count when entering a NEW session (not on every tick)
-        if tky_in and not self.strategy.tokyo.initialized:
-            # New Tokyo session starting - reset its trade_count in database
+        # Reset trade_count ONLY when session FIRST initializes (not on every tick)
+        if tky_in and not self.strategy.tokyo.initialized and self.last_tokyo_init != utc_dt:
             _trades_db.reset_session_counts(self.symbol, "tokyo")
+            self.strategy.tokyo.trade_count = 0
             self.last_tokyo_init = utc_dt
-            log.info("%s: New Tokyo session detected - trade_count reset to 0", self.symbol)
+            log.info("%s: New Tokyo session - trade_count reset to 0", self.symbol)
         
-        if ldn_in and not self.strategy.london.initialized:
-            # New London session starting - reset its trade_count in database
+        if ldn_in and not self.strategy.london.initialized and self.last_london_init != utc_dt:
             _trades_db.reset_session_counts(self.symbol, "london")
+            self.strategy.london.trade_count = 0
             self.last_london_init = utc_dt
-            log.info("%s: New London session detected - trade_count reset to 0", self.symbol)
+            log.info("%s: New London session - trade_count reset to 0", self.symbol)
 
         # Sync with MT5: check if any positions for this symbol exist that we're not tracking
         mt5_positions = mt5.positions_get(symbol=self.symbol)
@@ -465,6 +465,11 @@ class SymbolBot:
                     log.info("Synced existing position %d (%s %s) to %s session", 
                              pos.ticket, self.symbol, "BUY" if pos.type == mt5.ORDER_TYPE_BUY else "SELL", session.upper())
 
+        # CRITICAL: Sync strategy trade_count with database BEFORE generating signals
+        db_stats = _trades_db.get_session_stats(self.symbol)
+        self.strategy.tokyo.trade_count = db_stats.get("tokyo", {}).get("trade_count", 0)
+        self.strategy.london.trade_count = db_stats.get("london", {}).get("trade_count", 0)
+        
         signals = self.strategy.on_candle(
             utc_dt=utc_dt,
             high=latest_15m["high"], low=latest_15m["low"],
@@ -474,29 +479,29 @@ class SymbolBot:
         )
 
         for sig in signals:
-            # CRITICAL CHECK: Verify trade_count hasn't been exceeded before placing order
             session = sig["session"]
-            db_stats = _trades_db.get_session_stats(self.symbol)
-            current_trade_count = db_stats.get(session, {}).get("trade_count", 0)
+            current_trade_count = _trades_db.get_trade_count(self.symbol, session)
             
+            # Double-check limit hasn't been exceeded (strategy already checked, but verify)
             if current_trade_count >= MAX_TRADES_PER_SESSION:
-                log.warning("%s: Signal ignored - %s session already has %d/%d trades",
+                log.warning("%s: Signal BLOCKED - %s session at limit %d/%d trades",
                            self.symbol, session.upper(), current_trade_count, MAX_TRADES_PER_SESSION)
                 continue
             
-            lot    = calc_lot(self.symbol, sig["entry"], sig["sl"])
+            lot = calc_lot(self.symbol, sig["entry"], sig["sl"])
             ticket = place_order(self.symbol, sig["direction"],
                                  lot, sig["entry"], sig["sl"], sig["tp"], latest_15m["close"])
             if ticket:
-                # Increment trade_count in database IMMEDIATELY after placing order
+                # Increment trade_count ONCE when order is placed
                 _trades_db.increment_trade_count(self.symbol, session)
-                log.info("%s: Trade count incremented for %s session: %d/%d",
-                        self.symbol, session.upper(), current_trade_count + 1, MAX_TRADES_PER_SESSION)
+                new_count = _trades_db.get_trade_count(self.symbol, session)
+                log.info("%s: Order placed - %s session count: %d/%d",
+                        self.symbol, session.upper(), new_count, MAX_TRADES_PER_SESSION)
                 
-                # Check if this is a pending limit order (ticket > 0 but not in positions)
+                # Check if this is a pending limit order
                 mt5_pos = mt5.positions_get(ticket=ticket)
                 if not mt5_pos:
-                    # It's a pending order - track it with TP level for monitoring
+                    # Pending limit order - track for monitoring
                     self.pending_orders[ticket] = {
                         "ticket": ticket,
                         "symbol": self.symbol,
@@ -504,12 +509,11 @@ class SymbolBot:
                         "entry": sig["entry"],
                         "tp": sig["tp"],
                         "session": sig["session"],
+                        "counted": True,  # Already counted when placed
                     }
-                    log.info("Tracking pending limit order %d - will cancel if price reaches TP %.5f", ticket, sig["tp"])
+                    log.info("Pending limit order %d - will cancel if TP reached", ticket)
                 else:
-                    # It's a market order that filled immediately
-                    log.info("Trade opened in %s session: %s %s", 
-                             sig["session"].upper(), self.symbol, sig["direction"].upper())
+                    # Market order filled immediately
                     trade_data = {
                         "ticket":    ticket,
                         "symbol":    self.symbol,
@@ -524,6 +528,8 @@ class SymbolBot:
                     }
                     self.open_positions[ticket] = trade_data
                     _trades_db.add_open_trade(ticket, trade_data)
+                    log.info("Market order filled - %s %s in %s session",
+                            self.symbol, sig["direction"].upper(), session.upper())
         
         # Monitor pending limit orders and cancel if price reaches TP
         self._monitor_pending_orders()
@@ -566,20 +572,10 @@ class SymbolBot:
             mt5_order = mt5.orders_get(ticket=ticket)
             if not mt5_order:
                 # Order no longer exists (filled or cancelled)
-                # Check if it became a position (filled)
                 mt5_pos = mt5.positions_get(ticket=ticket)
                 if mt5_pos:
-                    # Order filled - move to open positions AND increment trade count
+                    # Limit order filled - move to open positions (already counted when placed)
                     pos = mt5_pos[0]
-                    order_session = order_info["session"]
-                    
-                    # Increment trade count when limit order fills
-                    if not order_info.get("counted", False):
-                        _trades_db.increment_trade_count(self.symbol, order_session)
-                        current_count = _trades_db.get_trade_count(self.symbol, order_session)
-                        log.info("%s: Limit order %d filled - trade count for %s session: %d/%d",
-                                self.symbol, ticket, order_session.upper(), current_count, MAX_TRADES_PER_SESSION)
-                    
                     trade_data = {
                         "ticket":    ticket,
                         "symbol":    self.symbol,
@@ -594,11 +590,15 @@ class SymbolBot:
                     }
                     self.open_positions[ticket] = trade_data
                     _trades_db.add_open_trade(ticket, trade_data)
-                    log.info("Limit order %d filled at %.5f - now tracking as position", ticket, pos.price_open)
+                    log.info("Limit order %d filled at %.5f (already counted)", ticket, pos.price_open)
                 else:
-                    log.info("Limit order %d no longer exists (cancelled or expired)", ticket)
+                    # Order cancelled/expired - decrement count since it never filled
+                    order_session = order_info["session"]
+                    _trades_db.decrement_trade_count(self.symbol, order_session)
+                    new_count = _trades_db.get_trade_count(self.symbol, order_session)
+                    log.info("Limit order %d cancelled - %s session count: %d/%d",
+                            ticket, order_session.upper(), new_count, MAX_TRADES_PER_SESSION)
                 
-                # Remove from pending tracking
                 del self.pending_orders[ticket]
                 continue
             
@@ -642,13 +642,16 @@ class SymbolBot:
                 }
                 result = mt5.order_send(request)
                 if result.retcode == mt5.TRADE_RETCODE_DONE:
-                    log.info("%s limit order %d CANCELLED: %s", direction.upper(), ticket, cancel_reason)
-                    # If order was never filled (never counted), no need to decrement
-                    # Pending orders are only counted when they fill
+                    # Decrement count since order was counted when placed but never filled
+                    order_session = order_info["session"]
+                    _trades_db.decrement_trade_count(self.symbol, order_session)
+                    new_count = _trades_db.get_trade_count(self.symbol, order_session)
+                    log.info("%s limit order %d CANCELLED: %s - %s session count: %d/%d",
+                            direction.upper(), ticket, cancel_reason, order_session.upper(), 
+                            new_count, MAX_TRADES_PER_SESSION)
                 else:
                     log.error("Failed to cancel limit order %d: %s", ticket, result.comment)
                 
-                # Remove from tracking
                 del self.pending_orders[ticket]
     
     def get_open(self):
