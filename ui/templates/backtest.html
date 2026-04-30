@@ -1,0 +1,892 @@
+{% extends "base.html" %}
+{% block title %}BOR Strategy — Backtest{% endblock %}
+{% block page_label %}Backtest{% endblock %}
+
+{% block extra_styles %}
+<style>
+/* ── ROOT & COLOR PALETTE ── */
+:root {
+  --bg: #0a0a0f;
+  --bg2: #111118;
+  --bg3: rgba(20, 20, 35, 0.92);
+  --border: rgba(120, 100, 255, 0.18);
+  --border-h: rgba(160, 130, 255, 0.45);
+  --purple: #a855f7;
+  --blue: #3b82f6;
+  --cyan: #22d3ee;
+  --green: #34d399;
+  --red: #f87171;
+  --amber: #fbbf24;
+  --fg: #e0e7ff;
+  --fg2: #a5b4fc;
+  --fg3: #818cf8;
+  --fg4: #c4c4ff;
+  --r: 18px;
+  --rx: 9999px;
+}
+
+/* ── PAGE BACKGROUND ── */
+.content {
+  padding: 32px 28px 50px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  min-height: 100vh;
+  background: transparent;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtle tech grid background */
+.content::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: 
+    linear-gradient(rgba(139, 92, 246, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139, 92, 246, 0.035) 1px, transparent 1px);
+  background-size: 45px 45px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── RUN PANEL ── */
+.run-panel {
+  background: var(--bg3);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 28px 26px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: flex-end;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 2;
+}
+
+.run-panel:hover {
+  border-color: var(--border-h);
+  box-shadow: 0 12px 45px rgba(0, 0, 0, 0.5);
+}
+
+.run-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-width: 160px;
+}
+
+.run-field label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--fg2);
+  text-transform: uppercase;
+  letter-spacing: 1.1px;
+}
+
+.run-field input,
+.run-field select {
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  outline: none;
+  transition: all 0.3s ease;
+}
+
+.run-field input:focus,
+.run-field select:focus {
+  border-color: var(--purple);
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.15);
+  background: rgba(20, 20, 35, 0.95);
+  transform: translateY(-1px);
+}
+
+.run-field input[type="date"] {
+  color-scheme: dark;
+}
+
+.run-field.grow {
+  flex: 1;
+  min-width: 220px;
+}
+
+.btn-run {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 13px 26px;
+  border-radius: var(--rx);
+  background: linear-gradient(135deg, var(--purple), var(--blue));
+  border: none;
+  color: white;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 0 25px rgba(168, 85, 247, 0.35);
+  transition: all 0.3s ease;
+  height: 48px;
+}
+
+.btn-run:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 0 40px rgba(168, 85, 247, 0.6);
+}
+
+.btn-run:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ── SYMBOL TABS ── */
+.sym-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.sym-tab {
+  padding: 8px 18px;
+  border-radius: 50px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg3);
+  color: var(--fg3);
+  transition: all 0.3s ease;
+}
+
+.sym-tab:hover {
+  border-color: var(--purple);
+  color: var(--fg);
+}
+
+.sym-tab.active {
+  background: rgba(168, 85, 247, 0.18);
+  border-color: var(--purple);
+  color: #e0e7ff;
+  box-shadow: 0 0 15px rgba(168, 85, 247, 0.25);
+}
+
+/* ── RESULT GRID ── */
+.result-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 900px) {
+  .result-grid { grid-template-columns: 1fr; }
+}
+
+/* ── STAT CARDS ── */
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 18px;
+}
+
+.stat-card {
+  background: var(--bg3);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 24px 22px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.stat-card:hover {
+  transform: translateY(-10px) scale(1.03);
+  border-color: var(--purple);
+  box-shadow: 0 25px 50px rgba(168, 85, 247, 0.28);
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 4px;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.stat-card:hover::before {
+  opacity: 1;
+}
+
+.stat-card.purple::before { background: linear-gradient(90deg, var(--purple), var(--blue)); }
+.stat-card.green::before  { background: linear-gradient(90deg, var(--green), var(--cyan)); }
+.stat-card.red::before    { background: linear-gradient(90deg, var(--red), var(--amber)); }
+.stat-card.amber::before  { background: linear-gradient(90deg, var(--amber), var(--cyan)); }
+
+.stat-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--fg2);
+  text-transform: uppercase;
+  letter-spacing: 1.3px;
+  margin-bottom: 12px;
+}
+
+.stat-val {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--fg);
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  letter-spacing: -0.6px;
+  line-height: 1;
+}
+
+.stat-val.green  { color: var(--green); text-shadow: 0 0 20px rgba(52, 211, 153, 0.6); }
+.stat-val.red    { color: var(--red); }
+.stat-val.purple { color: var(--purple); }
+.stat-val.amber  { color: var(--amber); }
+
+.stat-sub {
+  font-size: 11.5px;
+  color: var(--fg3);
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
+/* ── WIN RATE COMPARISON ── */
+.wr-compare {
+  background: var(--bg3);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 26px 24px;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.45);
+}
+
+.wr-compare:hover {
+  border-color: var(--purple);
+  transform: translateY(-8px);
+  box-shadow: 0 25px 60px rgba(168, 85, 247, 0.25);
+}
+
+.wr-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--fg2);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.wr-title-bar {
+  width: 4px;
+  height: 16px;
+  border-radius: 4px;
+}
+
+.wr-row { display: flex; flex-direction: column; gap: 18px; }
+
+.wr-item-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.wr-item-label {
+  font-size: 12.5px;
+  color: var(--fg4);
+  font-weight: 500;
+}
+
+.wr-item-val {
+  font-size: 15px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.wr-bar-bg {
+  height: 7px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.wr-bar {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ── SESSION BREAKDOWN ── */
+.ses-breakdown {
+  background: var(--bg3);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.45);
+}
+
+.ses-breakdown:hover {
+  border-color: var(--purple);
+  transform: translateY(-8px);
+  box-shadow: 0 25px 60px rgba(168, 85, 247, 0.25);
+}
+
+.panel-head {
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,0.035);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.panel-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--fg2);
+  text-transform: uppercase;
+  letter-spacing: 1.1px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.panel-title-bar {
+  width: 4px;
+  height: 18px;
+  border-radius: 4px;
+}
+
+.ses-rows {
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ses-stat-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.ses-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ses-name-lbl {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg4);
+  width: 70px;
+  flex-shrink: 0;
+}
+
+.ses-nums {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--fg3);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.ses-num span { font-weight: 700; }
+
+/* ── TRADES TABLE ── */
+.trades-panel {
+  background: var(--bg3);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+  z-index: 2;
+}
+
+.tbl-wrap {
+  max-height: 380px;
+  overflow: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 680px;
+}
+
+th {
+  background: rgba(255,255,255,0.045);
+  color: var(--fg2);
+  padding: 13px 14px;
+  font-size: 9.8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.9px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  border-bottom: 1px solid var(--border);
+}
+
+td {
+  padding: 13px 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.2px;
+  color: var(--fg3);
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  transition: all 0.25s ease;
+}
+
+tr:hover td {
+  background: rgba(168, 85, 247, 0.09);
+  color: var(--fg);
+}
+
+/* Empty & Loading States */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 40px;
+  gap: 16px;
+  color: var(--fg2);
+  text-align: center;
+  background: var(--bg3);
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(168, 85, 247, 0.2);
+  border-top-color: var(--purple);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 1150px) {
+  .stat-row { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (max-width: 900px) {
+  .run-panel { flex-direction: column; align-items: stretch; }
+  .run-field { min-width: unset; }
+  .btn-run { width: 100%; justify-content: center; }
+  .result-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 680px) {
+  .content { padding: 20px 16px 40px; gap: 22px; }
+  .run-panel { padding: 22px 20px; gap: 16px; }
+  .run-field label { font-size: 9.5px; }
+  .run-field input, .run-field select { padding: 10px 14px; font-size: 12px; }
+  .btn-run { padding: 12px 22px; font-size: 12.5px; height: 44px; }
+  
+  .sym-tabs { gap: 8px; }
+  .sym-tab { padding: 7px 15px; font-size: 11.5px; }
+  
+  .stat-row { grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  .stat-card { padding: 18px 16px; }
+  .stat-label { font-size: 9.5px; }
+  .stat-val { font-size: 22px; }
+  .stat-sub { font-size: 10.5px; }
+  
+  .wr-compare, .ses-breakdown { padding: 20px 18px; }
+  .wr-title, .panel-title { font-size: 10px; }
+  .wr-item-label { font-size: 11.5px; }
+  .wr-item-val { font-size: 13.5px; }
+  
+  .ses-rows { padding: 18px 18px; gap: 14px; }
+  .ses-stat-row { flex-wrap: wrap; }
+  .ses-name-lbl { width: auto; }
+  .ses-nums { gap: 12px; font-size: 11px; }
+  
+  .panel-head { padding: 14px 18px; }
+  .tbl-wrap { overflow-x: auto; }
+  table { min-width: 650px; }
+  th { padding: 11px 10px; font-size: 9px; }
+  td { padding: 11px 10px; font-size: 11px; }
+}
+
+@media (max-width: 480px) {
+  .content { padding: 16px 12px 32px; gap: 18px; }
+  .run-panel { padding: 18px 16px; gap: 14px; }
+  .run-field input, .run-field select { padding: 9px 12px; font-size: 11.5px; }
+  .btn-run { padding: 11px 20px; font-size: 12px; height: 42px; }
+  
+  .stat-row { grid-template-columns: 1fr; gap: 12px; }
+  .stat-card { padding: 16px 14px; }
+  .stat-val { font-size: 20px; }
+  .stat-sub { font-size: 10px; }
+  
+  .wr-compare, .ses-breakdown { padding: 18px 16px; }
+  .wr-row { gap: 14px; }
+  .wr-item-label { font-size: 11px; }
+  .wr-item-val { font-size: 12.5px; }
+  
+  .ses-rows { padding: 16px 16px; gap: 12px; }
+  .ses-stat-row { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .ses-nums { flex-direction: column; gap: 6px; font-size: 10.5px; }
+  
+  .panel-head { padding: 12px 14px; flex-direction: column; align-items: flex-start; gap: 8px; }
+  table { min-width: 600px; }
+  th { padding: 10px 8px; font-size: 8.5px; }
+  td { padding: 10px 8px; font-size: 10.5px; }
+  
+  .empty-state { padding: 60px 30px; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="content">
+
+  <!-- RUN PANEL -->
+  <div class="run-panel">
+    <div class="run-field">
+      <label>Symbol</label>
+      <select id="bt-symbol"></select>
+    </div>
+    <div class="run-field">
+      <label>From Date</label>
+      <input type="date" id="bt-from">
+    </div>
+    <div class="run-field">
+      <label>To Date</label>
+      <input type="date" id="bt-to">
+    </div>
+    <div class="run-field">
+      <label>Initial Balance ($)</label>
+      <input type="number" id="bt-balance" value="10000" min="100">
+    </div>
+    <div class="run-field">
+      <label>Risk per Trade (%)</label>
+      <input type="number" id="bt-risk" value="1" min="0.1" max="10" step="0.1">
+    </div>
+    <div class="run-field">
+      <label>Max Trades/Session</label>
+      <input type="number" id="bt-max-trades" value="2" min="1" max="10" step="1">
+    </div>
+    <button class="btn-run" id="bt-run-btn" onclick="runBacktest()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="5 3 19 12 5 21 5 3"/>
+      </svg>
+      Run Backtest
+    </button>
+  </div>
+
+  <!-- SYMBOL TABS -->
+  <div id="sym-tabs-wrap" style="display:none">
+    <div class="sym-tabs" id="sym-tabs"></div>
+  </div>
+
+  <!-- LOADING -->
+  <div id="bt-loading" style="display:none">
+    <div class="empty-state">
+      <div class="spinner"></div>
+      <p>Running backtest on historical data...<br><small>This may take a few seconds</small></p>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="bt-results" style="display:none">
+
+    <!-- Statistics Cards -->
+    <div class="stat-row" id="bt-stats"></div>
+
+    <!-- Win Rate + Session Breakdown -->
+    <div class="result-grid" style="margin-top: 20px;">
+      <!-- Win Rate Comparison -->
+      <div class="wr-compare">
+        <div class="wr-title">
+          <div class="wr-title-bar" style="background:linear-gradient(180deg,var(--purple),var(--blue))"></div>
+          Win Rate Comparison
+        </div>
+        <div class="wr-row" id="wr-rows"></div>
+      </div>
+
+      <!-- Session Breakdown -->
+      <div class="ses-breakdown">
+        <div class="panel-head">
+          <div class="panel-title">
+            <div class="panel-title-bar" style="background:linear-gradient(180deg,var(--amber),var(--red))"></div>
+            Session Breakdown
+          </div>
+        </div>
+        <div class="ses-rows" id="ses-rows"></div>
+      </div>
+    </div>
+
+    <!-- Trades Table -->
+    <div class="trades-panel" style="margin-top: 24px;">
+      <div class="panel-head">
+        <div class="panel-title">
+          <div class="panel-title-bar" style="background:linear-gradient(180deg,var(--green),var(--cyan))"></div>
+          Backtest Trades
+        </div>
+        <span id="bt-trade-count" style="font-size:10px; font-weight:700; padding:5px 12px; border-radius:999px; background:rgba(255,255,255,0.06); color:var(--fg3);">0 trades</span>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Session</th>
+              <th>Dir</th>
+              <th>Entry</th>
+              <th>SL</th>
+              <th>TP</th>
+              <th>Result</th>
+              <th>P&L</th>
+              <th>Balance</th>
+            </tr>
+          </thead>
+          <tbody id="bt-tbody">
+            <tr class="t-empty"><td colspan="9">No trades yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- EMPTY STATE -->
+  <div id="bt-empty">
+    <div class="empty-state">
+      <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+      <p><strong>Ready to test your strategy.</strong><br>
+      Choose a symbol, set your parameters, and run a backtest.</p>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let _allResults = {};
+let _activeSymbol = null;
+
+// Load available symbols
+async function loadSymbols() {
+  try {
+    const r = await fetch('/backtest/symbols').then(res => res.json());
+    const sel = document.getElementById('bt-symbol');
+    sel.innerHTML = r.symbols.map(s => `<option value="${s}">${s}</option>`).join('');
+  } catch(e) {}
+}
+loadSymbols();
+
+// Load previously saved results
+async function loadSavedResults() {
+  try {
+    const r = await fetch('/backtest/results').then(res => res.json());
+    Object.assign(_allResults, r);
+    if (Object.keys(_allResults).length > 0) {
+      renderTabs();
+      showResult(Object.keys(_allResults)[0]);
+    }
+  } catch(e) {}
+}
+loadSavedResults();
+
+// Set default date range (last 4 months)
+(function() {
+  const now = new Date();
+  const from = new Date(now);
+  from.setMonth(from.getMonth() - 4);
+  document.getElementById('bt-from').value = from.toISOString().slice(0,10);
+  document.getElementById('bt-to').value = now.toISOString().slice(0,10);
+})();
+
+async function runBacktest() {
+  const symbol = document.getElementById('bt-symbol').value;
+  const balance = parseFloat(document.getElementById('bt-balance').value) || 10000;
+  const risk_pct = parseFloat(document.getElementById('bt-risk').value) || 1.0;
+  const max_trades = parseInt(document.getElementById('bt-max-trades').value) || 2;
+  const date_from = document.getElementById('bt-from').value;
+  const date_to = document.getElementById('bt-to').value;
+
+  // UI Feedback
+  document.getElementById('bt-run-btn').disabled = true;
+  document.getElementById('bt-empty').style.display = 'none';
+  document.getElementById('bt-results').style.display = 'none';
+  document.getElementById('bt-loading').style.display = 'block';
+
+  try {
+    const res = await fetch('/backtest/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol, balance, risk_pct, max_trades, date_from, date_to })
+    });
+
+    const j = await res.json();
+    if (!j.ok) throw new Error(j.msg || 'Backtest failed');
+
+    _allResults[symbol] = j.result;
+    renderTabs();
+    showResult(symbol);
+  } catch (err) {
+    alert('Backtest Error: ' + err.message);
+    document.getElementById('bt-empty').style.display = 'block';
+  } finally {
+    document.getElementById('bt-loading').style.display = 'none';
+    document.getElementById('bt-run-btn').disabled = false;
+  }
+}
+
+function renderTabs() {
+  const wrap = document.getElementById('sym-tabs-wrap');
+  const container = document.getElementById('sym-tabs');
+  const symbols = Object.keys(_allResults);
+
+  if (!symbols.length) {
+    wrap.style.display = 'none';
+    return;
+  }
+
+  wrap.style.display = 'block';
+  container.innerHTML = symbols.map(s => `
+    <div class="sym-tab ${s === _activeSymbol ? 'active' : ''}" onclick="showResult('${s}')">
+      ${s}
+    </div>
+  `).join('');
+}
+
+function showResult(symbol) {
+  _activeSymbol = symbol;
+  renderTabs();
+
+  const result = _allResults[symbol];
+  if (!result) return;
+
+  document.getElementById('bt-empty').style.display = 'none';
+  document.getElementById('bt-results').style.display = 'block';
+
+  const netPositive = result.net_pnl >= 0;
+
+  // Stat Cards
+  document.getElementById('bt-stats').innerHTML = `
+    <div class="stat-card purple">
+      <div class="stat-label">Total Trades</div>
+      <div class="stat-val purple">${result.total}</div>
+      <div class="stat-sub">${result.wins} Wins • ${result.losses} Losses</div>
+    </div>
+    <div class="stat-card ${result.win_rate >= 50 ? 'green' : 'red'}">
+      <div class="stat-label">Win Rate</div>
+      <div class="stat-val ${result.win_rate >= 50 ? 'green' : 'red'}">${result.win_rate.toFixed(1)}%</div>
+      <div class="stat-sub">${result.timeframe || '—'}</div>
+    </div>
+    <div class="stat-card ${netPositive ? 'green' : 'red'}">
+      <div class="stat-label">Net P&L</div>
+      <div class="stat-val ${netPositive ? 'green' : 'red'}">
+        ${netPositive ? '+' : ''}$${result.net_pnl.toLocaleString('en-US', {minimumFractionDigits:2})}
+      </div>
+      <div class="stat-sub">${netPositive ? '+' : ''}${result.net_pct || 0}% return</div>
+    </div>
+    <div class="stat-card amber">
+      <div class="stat-label">Date Range</div>
+      <div class="stat-val amber" style="font-size:13px;">${result.date_range || '—'}</div>
+      <div class="stat-sub">Final Balance: $${result.final?.toLocaleString()}</div>
+    </div>
+  `;
+
+  // Win Rate Comparison
+  const act = result.actual || {win_rate: 0, wins:0, losses:0, total:0};
+  document.getElementById('wr-rows').innerHTML = `
+    <div class="wr-item">
+      <div class="wr-item-head">
+        <span class="wr-item-label">Backtest Win Rate</span>
+        <span class="wr-item-val" style="color:${result.win_rate >= 50 ? 'var(--green)' : 'var(--red)'}">${result.win_rate.toFixed(1)}%</span>
+      </div>
+      <div class="wr-bar-bg"><div class="wr-bar" style="width:${result.win_rate}%; background:${result.win_rate >= 50 ? 'var(--green)' : 'var(--red)'}"></div></div>
+    </div>
+    <div class="wr-item">
+      <div class="wr-item-head">
+        <span class="wr-item-label">Live Trade Win Rate</span>
+        <span class="wr-item-val" style="color:${act.win_rate >= 50 ? 'var(--green)' : 'var(--red)'}">
+          ${act.win_rate ? act.win_rate.toFixed(1) + '%' : 'No data'}
+        </span>
+      </div>
+      <div class="wr-bar-bg"><div class="wr-bar" style="width:${act.win_rate || 0}%; background:${(act.win_rate || 0) >= 50 ? 'var(--green)' : 'var(--red)'}"></div></div>
+    </div>
+  `;
+
+  // Session Breakdown
+  const ses = result.sessions || {};
+  document.getElementById('ses-rows').innerHTML = ['tokyo', 'london'].map(name => {
+    const d = ses[name] || {total:0, wins:0, losses:0, win_rate:0, pnl:0};
+    const color = name === 'tokyo' ? '#c084fc' : '#60a5fa';
+    const pnlPos = d.pnl >= 0;
+    return `
+      <div class="ses-stat-row">
+        <span class="ses-dot" style="background:${color}"></span>
+        <span class="ses-name-lbl">${name.charAt(0).toUpperCase() + name.slice(1)}</span>
+        <div class="ses-nums">
+          <span class="ses-num">Trades: <span style="color:var(--purple)">${d.total}</span></span>
+          <span class="ses-num">Win Rate: <span style="color:${d.win_rate >= 50 ? 'var(--green)' : 'var(--red)'}">${d.win_rate}%</span></span>
+          <span class="ses-num">P&L: <span style="color:${pnlPos ? 'var(--green)' : 'var(--red)'}">${pnlPos ? '+' : ''}$${d.pnl.toFixed(2)}</span></span>
+        </div>
+      </div>`;
+  }).join('');
+
+  // Trades Table
+  const trades = result.trades || [];
+  document.getElementById('bt-trade-count').textContent = `${trades.length} trades`;
+  document.getElementById('bt-tbody').innerHTML = trades.length === 0 
+    ? `<tr class="t-empty"><td colspan="9">No trades executed in this backtest</td></tr>`
+    : trades.slice(-50).reverse().map(t => {
+        const isWin = t.outcome === 'tp' || t.pnl > 0;
+        return `<tr>
+          <td>${t.time}</td>
+          <td>${t.session}</td>
+          <td class="${t.direction==='buy' ? 't-buy' : 't-sell'}">${t.direction.toUpperCase()}</td>
+          <td>${t.entry.toFixed(5)}</td>
+          <td>${t.sl.toFixed(5)}</td>
+          <td>${t.tp.toFixed(5)}</td>
+          <td class="${isWin ? 't-tp' : 't-sl'}">${isWin ? '✓ TP' : '✗ SL'}</td>
+          <td class="${t.pnl >= 0 ? 't-pos' : 't-neg'}">${t.pnl >= 0 ? '+' : ''}$${Math.abs(t.pnl).toFixed(2)}</td>
+          <td>$${t.balance.toFixed(2)}</td>
+        </tr>`;
+      }).join('');
+}
+
+// Keyboard support
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const active = document.activeElement;
+    if (['bt-from','bt-to','bt-balance','bt-risk'].includes(active.id)) {
+      runBacktest();
+    }
+  }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}BOR Strategy{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Syne:wght@700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <style>
+    /* ── ROOT & GLOBAL STYLES (Unified with Dashboard) ── */
+    :root {
+        --bg:        #0a0a0f;
+        --bg2:       #111118;
+        --bg3:       rgba(20, 20, 35, 0.92);
+        --border:    rgba(120, 100, 255, 0.18);
+        --border-h:  rgba(160, 130, 255, 0.45);
+        --purple:    #a855f7;
+        --blue:      #3b82f6;
+        --cyan:      #22d3ee;
+        --green:     #34d399;
+        --red:       #f87171;
+        --amber:     #fbbf24;
+        --fg:        #e0e7ff;
+        --fg2:       #a5b4fc;
+        --fg3:       #818cf8;
+        --fg4:       #c4c4ff;
+        --sidebar-w: 240px;
+        --topbar-h:  62px;
+        --r:  18px;
+        --rx: 9999px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+        background: var(--bg);
+        color: var(--fg);
+        font-family: 'Space Grotesk', system-ui, sans-serif;
+        font-size: 13px;
+        min-height: 100vh;
+        overflow-x: hidden;
+        line-height: 1.5;
+    }
+
+    /* Subtle background effects */
+    body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        background: 
+            linear-gradient(135deg, #0a0a0f 0%, #1a1625 100%);
+    }
+
+    /* ── APP SHELL ── */
+    .app-shell {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        min-height: 100vh;
+    }
+
+    /* ── SIDEBAR ── */
+    .sidebar {
+        width: var(--sidebar-w);
+        flex-shrink: 0;
+        background: rgba(15, 15, 30, 0.96);
+        backdrop-filter: blur(20px) saturate(1.6);
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        position: fixed;
+        top: 0; left: 0;
+        height: 100vh;
+        overflow-y: auto;
+        z-index: 200;
+        transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+
+    .sidebar-logo {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 22px 20px 18px;
+        border-bottom: 1px solid var(--border);
+        flex-shrink: 0;
+    }
+
+    .logo-mark {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, var(--purple), var(--blue));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: 'Syne', sans-serif;
+        font-size: 18px;
+        font-weight: 800;
+        color: white;
+        box-shadow: 0 0 25px rgba(168, 85, 247, 0.5),
+                    inset 0 2px 0 rgba(255,255,255,0.2);
+    }
+
+    .logo-name {
+        font-family: 'Syne', sans-serif;
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: -0.4px;
+    }
+
+    .logo-tagline {
+        font-size: 9.5px;
+        color: var(--fg2);
+        letter-spacing: 0.4px;
+    }
+
+    .sidebar-section {
+        padding: 16px 12px 8px;
+    }
+
+    .sidebar-section-label {
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--fg2);
+        text-transform: uppercase;
+        letter-spacing: 1.1px;
+        padding: 0 10px 6px;
+    }
+
+    .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 11px 14px;
+        border-radius: 12px;
+        font-size: 13.2px;
+        font-weight: 500;
+        color: var(--fg3);
+        text-decoration: none;
+        cursor: pointer;
+        transition: all 0.25s ease;
+        margin-bottom: 3px;
+    }
+
+    .nav-item:hover {
+        background: rgba(168, 85, 247, 0.1);
+        color: var(--fg);
+    }
+
+    .nav-item.active {
+        background: rgba(168, 85, 247, 0.18);
+        border: 1px solid rgba(168, 85, 247, 0.4);
+        color: #e0e7ff;
+    }
+
+    .nav-item svg {
+        width: 17px;
+        height: 17px;
+        flex-shrink: 0;
+        opacity: 0.75;
+    }
+
+    .sidebar-divider {
+        height: 1px;
+        background: var(--border);
+        margin: 8px 14px;
+    }
+
+    .bot-status-row {
+        padding: 10px 16px;
+        font-size: 12px;
+        color: var(--fg3);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    .dot-green { background: var(--green); box-shadow: 0 0 10px var(--green); animation: pulse 2s infinite; }
+    .dot-red   { background: var(--red);   box-shadow: 0 0 10px var(--red); animation: pulse 2s infinite; }
+    .dot-amber { background: var(--amber); box-shadow: 0 0 10px var(--amber); animation: pulse 2s infinite; }
+
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+
+    .sidebar-bottom {
+        margin-top: auto;
+        padding: 16px 14px 20px;
+        border-top: 1px solid var(--border);
+    }
+
+    #sb-clock {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10.5px;
+        color: var(--fg2);
+        text-align: center;
+        padding: 6px;
+        letter-spacing: 0.5px;
+    }
+
+    /* ── MAIN AREA ── */
+    .main-area {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        margin-left: var(--sidebar-w);
+        transition: margin-left 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+
+    /* ── TOPBAR ── */
+    .topbar {
+        height: var(--topbar-h);
+        background: rgba(10, 10, 15, 0.95);
+        backdrop-filter: blur(20px);
+        border-bottom: 1px solid var(--border);
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 28px;
+        gap: 16px;
+    }
+
+    .topbar-left {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+    }
+
+    .hamburger {
+        display: none;
+        flex-direction: column;
+        justify-content: center;
+        gap: 4px;
+        width: 38px;
+        height: 38px;
+        background: rgba(255,255,255,0.05);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        cursor: pointer;
+    }
+
+    .hamburger span {
+        display: block;
+        width: 18px;
+        height: 2px;
+        background: var(--fg3);
+        border-radius: 2px;
+        transition: all 0.3s ease;
+    }
+
+    .page-label {
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--fg2);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .topbar-right {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    #clock {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 12px;
+        color: var(--fg3);
+        background: rgba(255,255,255,0.04);
+        border: 1px solid var(--border);
+        padding: 6px 14px;
+        border-radius: var(--rx);
+    }
+
+    .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 6px 14px;
+        border-radius: var(--rx);
+        font-size: 11.5px;
+        font-weight: 600;
+        letter-spacing: 0.4px;
+    }
+
+    .pill-green {
+        background: rgba(52, 211, 153, 0.15);
+        color: var(--green);
+        border: 1px solid rgba(52, 211, 153, 0.5);
+    }
+
+    .pill-red {
+        background: rgba(248, 113, 113, 0.15);
+        color: var(--red);
+        border: 1px solid rgba(248, 113, 113, 0.5);
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-thumb {
+        background: rgba(168, 85, 247, 0.3);
+        border-radius: 10px;
+    }
+
+    /* Sidebar Overlay for mobile */
+    .sidebar-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(4px);
+        z-index: 150;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .sidebar-overlay.open {
+        display: block;
+        opacity: 1;
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 900px) {
+        :root { 
+            --sidebar-w: 260px;
+            --topbar-h: 56px;
+        }
+    }
+
+    @media (max-width: 720px) {
+        :root {
+            --sidebar-w: 280px;
+            --topbar-h: 54px;
+        }
+        
+        .sidebar {
+            transform: translateX(-100%);
+            width: 280px;
+        }
+        .sidebar.open {
+            transform: translateX(0);
+            box-shadow: 4px 0 20px rgba(0, 0, 0, 0.5);
+        }
+        .main-area {
+            margin-left: 0 !important;
+        }
+        .hamburger { 
+            display: flex;
+            align-items: center;
+        }
+        .topbar {
+            padding: 0 14px;
+            height: 54px;
+        }
+        .page-label {
+            font-size: 10.5px;
+        }
+        #clock {
+            font-size: 9.5px;
+            padding: 4px 9px;
+        }
+        .pill {
+            font-size: 9.5px;
+            padding: 4px 9px;
+            gap: 5px;
+        }
+        .dot {
+            width: 6px;
+            height: 6px;
+        }
+    }
+
+    @media (max-width: 480px) {
+        :root {
+            --topbar-h: 50px;
+        }
+        
+        .topbar {
+            padding: 0 10px;
+            height: 50px;
+        }
+        .topbar-left {
+            gap: 10px;
+        }
+        .topbar-right {
+            gap: 8px;
+        }
+        .page-label {
+            display: none;
+        }
+        #clock {
+            display: none;
+        }
+        .pill {
+            font-size: 9px;
+            padding: 4px 8px;
+        }
+        .hamburger {
+            width: 34px;
+            height: 34px;
+        }
+        .hamburger span {
+            width: 16px;
+        }
+    }
+
+    /* Allow template to inject more styles */
+    {% block extra_styles %}{% endblock %}
+    </style>
+</head>
+<body>
+
+<div class="app-shell">
+
+    <!-- SIDEBAR -->
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-logo">
+            <div class="logo-mark">B</div>
+            <div>
+                <div class="logo-name">BOR Strategy</div>
+                <div class="logo-tagline">Break-of-Range System</div>
+            </div>
+        </div>
+
+        <div class="sidebar-section">
+            <div class="sidebar-section-label">Navigation</div>
+            <a href="/" class="nav-item {% if active_page == 'dashboard' %}active{% endif %}" onclick="closeSidebar()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                    <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+                </svg>
+                Live Dashboard
+            </a>
+            <a href="/performance_page" class="nav-item {% if active_page == 'performance' %}active{% endif %}" onclick="closeSidebar()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+                    <polyline points="17 6 23 6 23 12"/>
+                </svg>
+                Performance
+            </a>
+            <a href="/backtest" class="nav-item {% if active_page == 'backtest' %}active{% endif %}" onclick="closeSidebar()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                </svg>
+                Backtest
+            </a>
+            <a href="/settings" class="nav-item {% if active_page == 'settings' %}active{% endif %}" onclick="closeSidebar()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+                Settings
+            </a>
+        </div>
+
+        <div class="sidebar-divider"></div>
+
+        <div class="sidebar-section">
+            <div class="sidebar-section-label">Bot Control</div>
+            <div class="bot-status-row">
+                <span class="dot dot-red" id="sb-bot-dot"></span>
+                <span id="sb-bot-status">Stopped</span>
+            </div>
+            <div class="bot-status-row" style="padding-top:0">
+                <span class="dot dot-red" id="sb-mt5-dot"></span>
+                <span id="sb-mt5-status">MT5 Disconnected</span>
+            </div>
+            <button class="nav-item" style="background:rgba(52,211,153,0.12);border:1px solid rgba(52,211,153,0.3);" onclick="sbBotStart()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="5 3 19 12 5 21 5 3"/>
+                </svg>
+                Start Bot
+            </button>
+            <button class="nav-item" style="background:rgba(248,113,113,0.12);border:1px solid rgba(248,113,113,0.3);" onclick="sbBotStop()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/>
+                </svg>
+                Stop Bot
+            </button>
+        </div>
+
+        <div class="sidebar-divider"></div>
+
+        <div class="sidebar-section">
+            <div class="sidebar-section-label">Sessions</div>
+            <div class="nav-item" style="cursor:default; justify-content:space-between;">
+                <span style="display:flex; align-items:center; gap:8px;">
+                    <span style="width:9px;height:9px;border-radius:50%;background:#c084fc;"></span>
+                    Tokyo
+                </span>
+                <span class="dot dot-red" id="sb-tky-dot"></span>
+            </div>
+            <div class="nav-item" style="cursor:default; justify-content:space-between;">
+                <span style="display:flex; align-items:center; gap:8px;">
+                    <span style="width:9px;height:9px;border-radius:50%;background:#60a5fa;"></span>
+                    London
+                </span>
+                <span class="dot dot-red" id="sb-ldn-dot"></span>
+            </div>
+        </div>
+
+        <div class="sidebar-bottom">
+            <div id="sb-clock">--:--:-- UTC</div>
+        </div>
+    </nav>
+
+    <!-- Sidebar Overlay -->
+    <div class="sidebar-overlay" id="sb-overlay" onclick="closeSidebar()"></div>
+
+    <!-- MAIN AREA -->
+    <div class="main-area">
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="hamburger" id="hamburger" onclick="toggleSidebar()">
+                    <span></span><span></span><span></span>
+                </button>
+                <span class="page-label">{% block page_label %}BOR Strategy{% endblock %}</span>
+            </div>
+            <div class="topbar-right">
+                <span id="clock">--.--.-- --:--:-- UTC</span>
+                <span id="status-badge" class="pill pill-red">
+                    <span class="dot dot-red" id="status-dot"></span>
+                    <span id="status-txt">DISCONNECTED</span>
+                </span>
+            </div>
+        </header>
+
+        {% block content %}{% endblock %}
+    </div>
+</div>
+
+<script>
+// Sidebar Controls
+function toggleSidebar() {
+    const sb = document.getElementById('sidebar');
+    const hb = document.getElementById('hamburger');
+    const ov = document.getElementById('sb-overlay');
+    const isOpen = sb.classList.toggle('open');
+    hb.classList.toggle('open', isOpen);
+    ov.classList.toggle('open', isOpen);
+}
+
+function closeSidebar() {
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('hamburger').classList.remove('open');
+    document.getElementById('sb-overlay').classList.remove('open');
+}
+
+// Clock
+function tick() {
+    const now = new Date();
+    const p = v => String(v).padStart(2, '0');
+    
+    const clockStr = `${now.getUTCFullYear()}-${p(now.getUTCMonth()+1)}-${p(now.getUTCDate())} ${p(now.getUTCHours())}:${p(now.getUTCMinutes())}:${p(now.getUTCSeconds())} UTC`;
+    document.getElementById('clock').textContent = clockStr;
+    
+    document.getElementById('sb-clock').textContent = 
+        `${p(now.getUTCHours())}:${p(now.getUTCMinutes())}:${p(now.getUTCSeconds())} UTC`;
+}
+setInterval(tick, 1000);
+tick();
+
+// Bot Controls
+async function sbBotStart() { 
+    await fetch('/bot/start', { method: 'POST' }); 
+}
+async function sbBotStop() { 
+    await fetch('/bot/stop', { method: 'POST' }); 
+}
+
+// Refresh Sidebar Status
+async function sbRefresh() {
+    try {
+        const res = await fetch('/state');
+        const s = await res.json();
+
+        // Main status badge
+        const badge = document.getElementById('status-badge');
+        const dot = document.getElementById('status-dot');
+        const txt = document.getElementById('status-txt');
+        
+        const connected = !!s.connected;
+        txt.textContent = connected ? 'CONNECTED' : 'DISCONNECTED';
+        badge.className = `pill ${connected ? 'pill-green' : 'pill-red'}`;
+        dot.className = `dot ${connected ? 'dot-green' : 'dot-red'}`;
+
+        // Bot status
+        const botRunning = !!s.bot_running;
+        document.getElementById('sb-bot-dot').className = `dot ${botRunning ? 'dot-green' : 'dot-red'}`;
+        document.getElementById('sb-bot-status').textContent = botRunning ? 'Running' : 'Stopped';
+
+        // MT5 status
+        document.getElementById('sb-mt5-dot').className = `dot ${connected ? 'dot-green' : 'dot-red'}`;
+        const mt5El = document.getElementById('sb-mt5-status');
+        mt5El.textContent = connected ? 'MT5 Connected' : 'MT5 Disconnected';
+        mt5El.style.color = connected ? 'var(--green)' : 'var(--fg3)';
+
+        // Sessions
+        const ses = s.sessions || {};
+        ['tokyo', 'london'].forEach(key => {
+            const el = document.getElementById(`sb-${key.slice(0,3)}-dot`);
+            if (el) {
+                el.className = `dot ${((ses[key]||{}).active) ? 'dot-green' : 'dot-red'}`;
+            }
+        });
+    } catch(e) {}
+}
+
+setInterval(sbRefresh, 2000);
+sbRefresh();
+
+// Close sidebar on Escape key
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeSidebar();
+});
+</script>
+
+{% block extra_scripts %}{% endblock %}
+</body>
+</html>

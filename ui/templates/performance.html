@@ -1,0 +1,844 @@
+{% extends "base.html" %}
+{% block title %}BOR Strategy — Performance{% endblock %}
+{% block page_label %}Performance Analytics{% endblock %}
+
+{% block extra_styles %}
+<style>
+/* ── ROOT & COLOR PALETTE ── */
+:root {
+  --bg: #0a0a0f;
+  --bg2: #111118;
+  --bg3: rgba(20, 20, 35, 0.92);
+  --border: rgba(120, 100, 255, 0.18);
+  --border-h: rgba(160, 130, 255, 0.45);
+  --purple: #a855f7;
+  --blue: #3b82f6;
+  --cyan: #22d3ee;
+  --green: #34d399;
+  --red: #f87171;
+  --amber: #fbbf24;
+  --fg: #e0e7ff;
+  --fg2: #a5b4fc;
+  --fg3: #818cf8;
+  --fg4: #c4c4ff;
+  --r: 18px;
+  --rx: 9999px;
+}
+
+/* ── PAGE BACKGROUND ── */
+.content {
+  padding: 32px 28px 50px;
+  background: transparent;
+  position: relative;
+  overflow: hidden;
+  min-height: 100vh;
+}
+
+.content::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: 
+    linear-gradient(rgba(139, 92, 246, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139, 92, 246, 0.035) 1px, transparent 1px);
+  background-size: 45px 45px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.perf-wrap {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  z-index: 2;
+}
+
+/* ── STATS GRID ── */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 18px;
+}
+
+.stat-card {
+  background: var(--bg3);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 24px 22px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, transparent, var(--purple), var(--cyan), transparent);
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-10px) scale(1.03);
+  border-color: var(--purple);
+  box-shadow: 0 25px 50px rgba(168, 85, 247, 0.28);
+}
+
+.stat-card:hover::before {
+  opacity: 1;
+}
+
+.stat-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--fg2);
+  text-transform: uppercase;
+  letter-spacing: 1.3px;
+  margin-bottom: 12px;
+}
+
+.stat-val {
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--fg);
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  letter-spacing: -0.6px;
+  line-height: 1;
+}
+
+.stat-val.pos { 
+  color: var(--green); 
+  text-shadow: 0 0 20px rgba(52, 211, 153, 0.6); 
+}
+.stat-val.neg { 
+  color: var(--red); 
+  text-shadow: 0 0 20px rgba(248, 113, 113, 0.6); 
+}
+
+.stat-sub {
+  font-size: 12px;
+  color: var(--fg3);
+  margin-top: 8px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ── CHART PANEL ── */
+.chart-panel {
+  background: var(--bg3);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.chart-panel:hover {
+  transform: translateY(-8px);
+  border-color: var(--purple);
+  box-shadow: 0 25px 60px rgba(168, 85, 247, 0.25);
+}
+
+.chart-head {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,0.035);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.chart-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--fg2);
+  text-transform: uppercase;
+  letter-spacing: 1.1px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.chart-title-bar {
+  width: 4px;
+  height: 18px;
+  border-radius: 4px;
+}
+
+.chart-body {
+  padding: 32px 24px;
+}
+
+.chart-container {
+  position: relative;
+  height: 500px;
+  width: 100%;
+}
+
+/* Time Range Selector */
+.time-range {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.time-btn {
+  padding: 6px 14px;
+  border-radius: 8px;
+  background: rgba(168, 85, 247, 0.1);
+  border: 1px solid var(--border);
+  color: var(--fg3);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.time-btn:hover {
+  background: rgba(168, 85, 247, 0.2);
+  border-color: var(--purple);
+  color: var(--fg);
+}
+
+.time-btn.active {
+  background: var(--purple);
+  border-color: var(--purple);
+  color: #0a0a0f;
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.5);
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 920px) {
+  .content {
+    padding: 24px 18px 40px;
+  }
+  .perf-wrap {
+    gap: 24px;
+  }
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+  .stat-val {
+    font-size: 28px;
+  }
+  .chart-container {
+    height: 400px;
+  }
+}
+
+@media (max-width: 680px) {
+  .content {
+    padding: 18px 14px 36px;
+  }
+  .perf-wrap {
+    gap: 20px;
+  }
+  .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .stat-card {
+    padding: 18px 16px;
+  }
+  .stat-label {
+    font-size: 9.5px;
+    margin-bottom: 10px;
+  }
+  .stat-val {
+    font-size: 24px;
+  }
+  .stat-sub {
+    font-size: 11px;
+  }
+  .chart-head {
+    padding: 14px 18px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .chart-body {
+    padding: 24px 18px;
+  }
+  .chart-container {
+    height: 320px;
+  }
+  .time-range {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .time-btn {
+    flex: 1;
+    font-size: 10px;
+    padding: 5px 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .content {
+    padding: 14px 10px 32px;
+  }
+  .perf-wrap {
+    gap: 16px;
+  }
+  .stats-grid {
+    gap: 12px;
+  }
+  .stat-card {
+    padding: 16px 14px;
+  }
+  .stat-label {
+    font-size: 9px;
+    margin-bottom: 8px;
+  }
+  .stat-val {
+    font-size: 22px;
+  }
+  .stat-sub {
+    font-size: 10px;
+  }
+  .chart-head {
+    padding: 12px 14px;
+  }
+  .chart-body {
+    padding: 20px 14px;
+  }
+  .chart-container {
+    height: 280px;
+  }
+  .time-btn {
+    font-size: 9px;
+    padding: 4px 8px;
+  }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="content">
+  <div class="perf-wrap">
+
+    <!-- STATS GRID -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Initial Balance</div>
+        <div class="stat-val" id="s-initial">$0.00</div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-label">Current Balance</div>
+        <div class="stat-val" id="s-balance">$0.00</div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-label">Current Equity</div>
+        <div class="stat-val" id="s-equity">$0.00</div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-label">Total P&L</div>
+        <div class="stat-val" id="s-pnl">$0.00</div>
+        <div class="stat-sub" id="s-pnl-pct">0.00%</div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-label">Peak Balance</div>
+        <div class="stat-val" id="s-peak">$0.00</div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-label">Drawdown</div>
+        <div class="stat-val" id="s-dd">$0.00</div>
+        <div class="stat-sub" id="s-dd-pct">0.00%</div>
+      </div>
+    </div>
+
+    <!-- CHART PANEL -->
+    <div class="chart-panel">
+      <div class="chart-head">
+        <div class="chart-title">
+          <div class="chart-title-bar" style="background:linear-gradient(180deg,var(--green),var(--cyan))"></div>
+          Balance & Equity Chart
+        </div>
+        <div class="time-range">
+          <button class="time-btn active" onclick="setTimeRange('all')">All</button>
+          <button class="time-btn" onclick="setTimeRange('1h')">1H</button>
+          <button class="time-btn" onclick="setTimeRange('4h')">4H</button>
+          <button class="time-btn" onclick="setTimeRange('today')">Today</button>
+        </div>
+      </div>
+      <div class="chart-body">
+        <div class="chart-container">
+          <canvas id="perfChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- SYMBOL PERFORMANCE CHART -->
+    <div class="chart-panel">
+      <div class="chart-head">
+        <div class="chart-title">
+          <div class="chart-title-bar" style="background:linear-gradient(180deg,var(--purple),var(--blue))"></div>
+          Symbol Performance
+        </div>
+        <div style="display:flex; align-items:center; gap:12px;">
+          <select id="symbol-select" onchange="loadSymbolPerformance()" style="padding:6px 14px; border-radius:8px; background:var(--bg2); border:1px solid var(--border); color:var(--fg); font-size:12px; font-weight:600; cursor:pointer;">
+            <option value="">Select Symbol...</option>
+          </select>
+          <div style="font-size:11px; color:var(--fg2); font-family:'JetBrains Mono',monospace;">
+            <span id="symbol-stats">—</span>
+          </div>
+        </div>
+      </div>
+      <div class="chart-body">
+        <div class="chart-container">
+          <canvas id="symbolChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+let perfChart = null;
+let symbolChart = null;
+let fullData = { labels: [], balances: [], equities: [] };
+let currentRange = 'all';
+
+const $ = id => document.getElementById(id);
+
+function initChart() {
+  const ctx = $('perfChart');
+  perfChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [
+        {
+          label: 'Balance',
+          data: [],
+          borderColor: '#34d399',
+          borderWidth: 3,
+          tension: 0.4,
+          fill: false,
+          pointRadius: 0,
+          pointHoverRadius: 8,
+          pointHoverBackgroundColor: '#34d399',
+          pointHoverBorderColor: '#fff',
+          pointHoverBorderWidth: 2
+        },
+        {
+          label: 'Equity',
+          data: [],
+          borderColor: '#22d3ee',
+          borderWidth: 3,
+          tension: 0.4,
+          fill: false,
+          pointRadius: 0,
+          pointHoverRadius: 8,
+          pointHoverBackgroundColor: '#22d3ee',
+          pointHoverBorderColor: '#fff',
+          pointHoverBorderWidth: 2
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        intersect: false,
+        mode: 'index'
+      },
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+          labels: {
+            color: '#a5b4fc',
+            font: { size: 13, weight: '700' },
+            padding: 20,
+            usePointStyle: true,
+            pointStyle: 'circle'
+          }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(20, 20, 35, 0.98)',
+          titleColor: '#e0e7ff',
+          bodyColor: '#a5b4fc',
+          borderColor: 'rgba(168, 85, 247, 0.6)',
+          borderWidth: 2,
+          padding: 16,
+          displayColors: true,
+          titleFont: { size: 13, weight: '700' },
+          bodyFont: { size: 12, weight: '600' },
+          callbacks: {
+            label: function(context) {
+              return context.dataset.label + ': $' + context.parsed.y.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          display: true,
+          grid: {
+            color: 'rgba(120, 100, 255, 0.1)',
+            drawBorder: false
+          },
+          ticks: {
+            color: '#818cf8',
+            font: { size: 11, weight: '600' },
+            maxRotation: 0,
+            autoSkip: true,
+            maxTicksLimit: 10
+          }
+        },
+        y: {
+          display: true,
+          grid: {
+            color: 'rgba(120, 100, 255, 0.1)',
+            drawBorder: false
+          },
+          ticks: {
+            color: '#818cf8',
+            font: { size: 11, weight: '600' },
+            callback: function(value) {
+              return '$' + value.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+function setTimeRange(range) {
+  currentRange = range;
+  
+  // Update button states
+  document.querySelectorAll('.time-btn').forEach(btn => {
+    btn.classList.remove('active');
+    if (btn.textContent.toLowerCase() === range.toLowerCase() || 
+        (range === 'all' && btn.textContent === 'All') ||
+        (range === '1h' && btn.textContent === '1H') ||
+        (range === '4h' && btn.textContent === '4H') ||
+        (range === 'today' && btn.textContent === 'Today')) {
+      btn.classList.add('active');
+    }
+  });
+  
+  // Filter data based on range
+  updateChartData();
+}
+
+function updateChartData() {
+  if (!fullData.labels.length) return;
+  
+  let filteredLabels = fullData.labels;
+  let filteredBalances = fullData.balances;
+  let filteredEquities = fullData.equities;
+  let startIdx = 0;
+  
+  if (currentRange !== 'all') {
+    const now = new Date();
+    let cutoffTime;
+    
+    if (currentRange === '1h') {
+      cutoffTime = new Date(now.getTime() - 60 * 60 * 1000);
+    } else if (currentRange === '4h') {
+      cutoffTime = new Date(now.getTime() - 4 * 60 * 60 * 1000);
+    } else if (currentRange === 'today') {
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+      cutoffTime = new Date(todayStart.getTime() - now.getTimezoneOffset() * 60000);
+    }
+    
+    // Find index where to start
+    for (let i = 0; i < fullData.timestamps.length; i++) {
+      const timestamp = new Date(fullData.timestamps[i]);
+      if (timestamp >= cutoffTime) {
+        startIdx = i;
+        break;
+      }
+    }
+    
+    filteredLabels = fullData.labels.slice(startIdx);
+    filteredBalances = fullData.balances.slice(startIdx);
+    filteredEquities = fullData.equities.slice(startIdx);
+  }
+  
+  // Update stats based on filtered data
+  if (filteredBalances.length > 0) {
+    const periodInitial = filteredBalances[0];
+    const currentBalance = filteredBalances[filteredBalances.length - 1];
+    const currentEquity = filteredEquities[filteredEquities.length - 1];
+    const periodPnl = currentBalance - periodInitial;
+    const periodPct = (periodPnl / periodInitial * 100);
+    const periodPeak = Math.max(...filteredBalances);
+    const periodDD = periodPeak - currentBalance;
+    const periodDDPct = (periodDD / periodPeak * 100);
+    
+    // Update Initial Balance based on time range
+    $('s-initial').textContent = '$' + periodInitial.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    
+    // Update P&L for this period
+    $('s-pnl').textContent = (periodPnl >= 0 ? '+$' : '-$') + Math.abs(periodPnl).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    $('s-pnl').className = 'stat-val ' + (periodPnl >= 0 ? 'pos' : 'neg');
+    $('s-pnl-pct').textContent = (periodPct >= 0 ? '+' : '') + periodPct.toFixed(2) + '%';
+    
+    // Update Peak Balance for this period
+    $('s-peak').textContent = '$' + periodPeak.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    
+    // Update Drawdown for this period
+    $('s-dd').textContent = '$' + periodDD.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    $('s-dd').className = 'stat-val ' + (periodDD > 0 ? 'neg' : '');
+    $('s-dd-pct').textContent = periodDDPct.toFixed(2) + '%';
+  }
+  
+  perfChart.data.labels = filteredLabels;
+  perfChart.data.datasets[0].data = filteredBalances;
+  perfChart.data.datasets[1].data = filteredEquities;
+  perfChart.update('none');
+}
+
+async function updatePerformance() {
+  try {
+    const p = await fetch('/performance').then(r => r.json());
+    
+    // Update Current Balance and Equity (these always show current values)
+    const balance = p.current_balance || 0;
+    const equity = p.current_equity || 0;
+    
+    $('s-balance').textContent = '$' + balance.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    
+    $('s-equity').textContent = '$' + equity.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    $('s-equity').className = 'stat-val ' + (equity >= balance ? 'pos' : 'neg');
+    
+    // Update chart data
+    if (p.history && p.history.length > 0) {
+      fullData.timestamps = p.history.map(h => h.time);
+      
+      // Smart label formatting based on data range
+      const firstTime = new Date(p.history[0].time);
+      const lastTime = new Date(p.history[p.history.length - 1].time);
+      const timeRangeHours = (lastTime - firstTime) / (1000 * 60 * 60);
+      
+      fullData.labels = p.history.map(h => {
+        const d = new Date(h.time);
+        
+        // If data spans more than 24 hours, show date + time
+        if (timeRangeHours > 24) {
+          return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' +
+                 d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        } else {
+          // Less than 24 hours, just show time
+          return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        }
+      });
+      
+      fullData.balances = p.history.map(h => h.balance);
+      fullData.equities = p.history.map(h => h.equity);
+      
+      // Update chart and stats based on current time range
+      updateChartData();
+    }
+  } catch(e) {
+    console.log('Failed to fetch performance data:', e);
+  }
+}
+
+initChart();
+setInterval(updatePerformance, 3000);  // Update every 3 seconds
+updatePerformance();
+
+// Initialize Symbol Performance Chart
+function initSymbolChart() {
+  const ctx = $('symbolChart');
+  symbolChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [
+        {
+          label: 'Cumulative P&L',
+          data: [],
+          borderColor: '#a855f7',
+          borderWidth: 3,
+          tension: 0.4,
+          fill: false,
+          pointRadius: 4,
+          pointHoverRadius: 8,
+          pointBackgroundColor: '#a855f7',
+          pointHoverBackgroundColor: '#a855f7',
+          pointBorderColor: '#fff',
+          pointHoverBorderWidth: 2
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        intersect: false,
+        mode: 'index'
+      },
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+          labels: {
+            color: '#a5b4fc',
+            font: { size: 13, weight: '700' },
+            padding: 20,
+            usePointStyle: true,
+            pointStyle: 'circle'
+          }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(20, 20, 35, 0.98)',
+          titleColor: '#e0e7ff',
+          bodyColor: '#a5b4fc',
+          borderColor: 'rgba(168, 85, 247, 0.6)',
+          borderWidth: 2,
+          padding: 16,
+          displayColors: true,
+          titleFont: { size: 13, weight: '700' },
+          bodyFont: { size: 12, weight: '600' },
+          callbacks: {
+            label: function(context) {
+              const val = context.parsed.y;
+              return 'P&L: ' + (val >= 0 ? '+$' : '-$') + Math.abs(val).toFixed(2);
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          display: true,
+          grid: {
+            color: 'rgba(120, 100, 255, 0.1)',
+            drawBorder: false
+          },
+          ticks: {
+            color: '#818cf8',
+            font: { size: 11, weight: '600' },
+            maxRotation: 45,
+            autoSkip: true,
+            maxTicksLimit: 10
+          }
+        },
+        y: {
+          display: true,
+          grid: {
+            color: 'rgba(120, 100, 255, 0.1)',
+            drawBorder: false
+          },
+          ticks: {
+            color: '#818cf8',
+            font: { size: 11, weight: '600' },
+            callback: function(value) {
+              return (value >= 0 ? '+$' : '-$') + Math.abs(value).toFixed(0);
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+initSymbolChart();
+
+// Load symbols into dropdown
+async function loadSymbols() {
+  try {
+    const response = await fetch('/state');
+    const state = await response.json();
+    const symbols = state.symbols || [];
+    
+    const select = $('symbol-select');
+    select.innerHTML = '<option value="">Select Symbol...</option>';
+    
+    symbols.forEach(sym => {
+      const option = document.createElement('option');
+      option.value = sym;
+      option.textContent = sym;
+      select.appendChild(option);
+    });
+  } catch(e) {
+    console.log('Failed to load symbols:', e);
+  }
+}
+
+loadSymbols();
+
+// Load performance data for selected symbol
+async function loadSymbolPerformance() {
+  const symbol = $('symbol-select').value;
+  
+  if (!symbol) {
+    // Clear chart
+    symbolChart.data.labels = [];
+    symbolChart.data.datasets[0].data = [];
+    symbolChart.update();
+    $('symbol-stats').textContent = '—';
+    return;
+  }
+  
+  try {
+    const response = await fetch(`/performance/symbol/${symbol}`);
+    const data = await response.json();
+    
+    if (data.error) {
+      console.error('Error loading symbol performance:', data.error);
+      return;
+    }
+    
+    // Update stats display
+    const winRate = data.win_rate || 0;
+    const totalPnl = data.total_pnl || 0;
+    const statsText = `${data.total_trades} trades | ${data.wins}W/${data.losses}L | ${winRate.toFixed(1)}% WR | ${totalPnl >= 0 ? '+' : ''}$${totalPnl.toFixed(2)}`;
+    $('symbol-stats').textContent = statsText;
+    $('symbol-stats').style.color = totalPnl >= 0 ? 'var(--green)' : 'var(--red)';
+    
+    // Update chart
+    if (data.history && data.history.length > 0) {
+      const labels = data.history.map(h => {
+        const d = new Date(h.time);
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' +
+               d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      });
+      
+      const pnlData = data.history.map(h => h.cumulative_pnl);
+      
+      symbolChart.data.labels = labels;
+      symbolChart.data.datasets[0].data = pnlData;
+      symbolChart.data.datasets[0].label = `${symbol} Cumulative P&L`;
+      
+      // Update line color based on final P&L
+      const finalPnl = pnlData[pnlData.length - 1] || 0;
+      symbolChart.data.datasets[0].borderColor = finalPnl >= 0 ? '#34d399' : '#f87171';
+      symbolChart.data.datasets[0].pointBackgroundColor = finalPnl >= 0 ? '#34d399' : '#f87171';
+      symbolChart.data.datasets[0].pointHoverBackgroundColor = finalPnl >= 0 ? '#34d399' : '#f87171';
+      
+      symbolChart.update();
+    } else {
+      // No trade history
+      symbolChart.data.labels = [];
+      symbolChart.data.datasets[0].data = [];
+      symbolChart.update();
+    }
+  } catch(e) {
+    console.log('Failed to load symbol performance:', e);
+  }
+}
+</script>
+{% endblock %}

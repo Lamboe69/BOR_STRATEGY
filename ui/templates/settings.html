@@ -1,0 +1,927 @@
+{% extends "base.html" %}
+{% block title %}BOR Strategy — Settings{% endblock %}
+{% block page_label %}Settings{% endblock %}
+
+{% block extra_styles %}
+<style>
+/* ── ROOT & COLOR PALETTE ── */
+:root {
+  --bg: #0a0a0f;
+  --bg2: #111118;
+  --bg3: rgba(20, 20, 35, 0.92);
+  --border: rgba(120, 100, 255, 0.18);
+  --border-h: rgba(160, 130, 255, 0.45);
+  --purple: #a855f7;
+  --blue: #3b82f6;
+  --cyan: #22d3ee;
+  --green: #34d399;
+  --red: #f87171;
+  --amber: #fbbf24;
+  --fg: #e0e7ff;
+  --fg2: #a5b4fc;
+  --fg3: #818cf8;
+  --fg4: #c4c4ff;
+  --r: 18px;
+  --rx: 9999px;
+}
+
+/* ── PAGE BACKGROUND ── */
+.content {
+  padding: 32px 28px 50px;
+  background: transparent;
+  position: relative;
+  overflow: hidden;
+  min-height: 100vh;
+}
+
+.content::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: 
+    linear-gradient(rgba(139, 92, 246, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139, 92, 246, 0.035) 1px, transparent 1px);
+  background-size: 45px 45px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── SAVE BAR ── */
+.save-bar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(10, 10, 15, 0.95);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 28px;
+}
+
+.save-bar-inner {
+  max-width: 860px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ── MAIN CONTENT ── */
+.settings-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 0;
+  z-index: 2;
+}
+
+.content-inner {
+  width: 100%;
+  max-width: 860px;
+  z-index: 2;
+}
+
+.page-title {
+  font-family: 'Syne', system-ui, sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--fg);
+  margin-bottom: 28px;
+  letter-spacing: -0.6px;
+}
+
+/* ── PANELS ── */
+.panel {
+  background: var(--bg3);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  margin-bottom: 28px;
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.panel:hover {
+  transform: translateY(-8px);
+  border-color: var(--purple);
+  box-shadow: 0 25px 60px rgba(168, 85, 247, 0.25);
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,0.035);
+}
+
+.panel-title-bar {
+  width: 4px;
+  height: 18px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.panel-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--fg2);
+  text-transform: uppercase;
+  letter-spacing: 1.1px;
+}
+
+.panel-body {
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ── FORM ROWS ── */
+.form-row {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  align-items: start;
+  gap: 20px;
+}
+
+.form-label {
+  font-size: 13px;
+  color: var(--fg3);
+  font-weight: 600;
+  padding-top: 8px;
+}
+
+.form-hint {
+  font-size: 11.5px;
+  color: var(--fg2);
+  margin-top: 6px;
+  line-height: 1.5;
+}
+
+/* Inputs */
+input[type="text"],
+input[type="number"],
+input[type="password"],
+input[type="time"],
+select {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  outline: none;
+  transition: all 0.3s ease;
+}
+
+select option {
+  background: var(--bg2);
+  color: var(--fg);
+}
+
+input:focus,
+select:focus {
+  border-color: var(--purple);
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.15);
+  background: rgba(20, 20, 35, 0.95);
+  transform: translateY(-1px);
+}
+
+/* Symbols */
+.symbols-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.sym-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 50px;
+  background: rgba(168, 85, 247, 0.18);
+  border: 1px solid rgba(168, 85, 247, 0.5);
+  color: #c4b5fd;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  box-shadow: 0 0 15px rgba(168, 85, 247, 0.25);
+}
+
+.sym-tag:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.4);
+}
+
+.sym-tag button {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.sym-tag button:hover {
+  opacity: 1;
+  color: var(--red);
+}
+
+.sym-add {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.sym-add input {
+  flex: 1;
+  max-width: 220px;
+}
+
+.sym-add select {
+  flex: 1;
+  max-width: 220px;
+}
+
+.btn-add {
+  padding: 12px 20px;
+  border-radius: var(--rx);
+  background: rgba(168, 85, 247, 0.15);
+  border: 1px solid var(--purple);
+  color: var(--purple);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-add:hover {
+  background: rgba(168, 85, 247, 0.25);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(168, 85, 247, 0.3);
+}
+
+.btn-add:active {
+  transform: translateY(0);
+}
+
+/* Sessions Grid */
+.ses-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.ses-block {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 22px;
+  transition: all 0.3s ease;
+}
+
+.ses-block:hover {
+  border-color: var(--border-h);
+  box-shadow: 0 8px 25px rgba(168, 85, 247, 0.15);
+}
+
+.ses-block-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--fg);
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ses-block-title span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.ses-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  font-size: 13px;
+  color: var(--fg4);
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.ses-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+/* Toggle Switch */
+.toggle {
+  position: relative;
+  width: 42px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: #1f1f2e;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--fg3);
+  left: 2px;
+  top: 2px;
+  transition: all 0.3s ease;
+}
+
+.toggle input:checked + .toggle-slider {
+  background: var(--green);
+  border-color: var(--green);
+}
+
+.toggle input:checked + .toggle-slider::before {
+  background: white;
+  transform: translateX(18px);
+}
+
+/* Buttons */
+.btn {
+  padding: 12px 24px;
+  border-radius: var(--rx);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-success {
+  background: linear-gradient(135deg, var(--green), var(--cyan));
+  color: #0a0a0f;
+  border: none;
+  box-shadow: 0 0 20px rgba(52, 211, 153, 0.4);
+  font-weight: 700;
+}
+
+.btn-success:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 0 35px rgba(52, 211, 153, 0.7);
+}
+
+/* Toast */
+#toast {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  padding: 14px 24px;
+  border-radius: var(--r);
+  background: var(--bg3);
+  border: 1px solid var(--green);
+  color: var(--green);
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all 0.4s ease;
+  z-index: 999;
+}
+
+#toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+#toast.err {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 20px rgba(52, 211, 153, 0.4); }
+  50% { transform: scale(1.05); box-shadow: 0 0 40px rgba(52, 211, 153, 0.8); }
+}
+
+/* Responsive */
+@media (max-width: 1150px) {
+  .form-row { 
+    grid-template-columns: 1fr; 
+    gap: 10px; 
+  }
+  .form-label { 
+    padding-top: 0; 
+  }
+}
+
+@media (max-width: 820px) {
+  .ses-grid { 
+    grid-template-columns: 1fr; 
+  }
+}
+
+@media (max-width: 680px) {
+  .content { 
+    padding: 20px 16px 40px; 
+  }
+  .save-bar {
+    padding: 14px 16px;
+  }
+  .save-bar-inner {
+    justify-content: center;
+  }
+  .page-title { 
+    font-size: 24px;
+    margin-bottom: 24px;
+  }
+  .panel {
+    margin-bottom: 20px;
+  }
+  .panel-head {
+    padding: 16px 18px;
+  }
+  .panel-body { 
+    padding: 22px 18px;
+    gap: 20px;
+  }
+  .symbols-wrap {
+    gap: 8px;
+  }
+  .sym-tag {
+    font-size: 12px;
+    padding: 7px 12px;
+  }
+  .sym-add {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .sym-add input,
+  .sym-add select {
+    max-width: 100%;
+  }
+  .btn-add {
+    width: 100%;
+    justify-content: center;
+  }
+  .ses-block {
+    padding: 18px;
+  }
+  .ses-row {
+    font-size: 12px;
+  }
+  .ses-row input[type="time"] {
+    font-size: 12px;
+    padding: 8px 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .content { 
+    padding: 16px 12px 32px; 
+  }
+  .save-bar {
+    padding: 12px;
+  }
+  .btn-success {
+    font-size: 12px;
+    padding: 10px 18px;
+  }
+  .page-title { 
+    font-size: 22px;
+    margin-bottom: 20px;
+  }
+  .panel {
+    margin-bottom: 16px;
+  }
+  .panel-head {
+    padding: 14px 16px;
+  }
+  .panel-title {
+    font-size: 10px;
+  }
+  .panel-body { 
+    padding: 18px 16px;
+    gap: 18px;
+  }
+  .form-label {
+    font-size: 12px;
+  }
+  .form-hint {
+    font-size: 10.5px;
+  }
+  input[type="text"],
+  input[type="number"],
+  input[type="password"],
+  input[type="time"] {
+    padding: 10px 14px;
+    font-size: 12px;
+  }
+  .symbols-wrap {
+    gap: 6px;
+  }
+  .sym-tag {
+    font-size: 11px;
+    padding: 6px 10px;
+  }
+  .sym-tag button {
+    font-size: 16px;
+  }
+  .btn-add {
+    font-size: 12px;
+    padding: 10px 16px;
+  }
+  .ses-block {
+    padding: 16px;
+  }
+  .ses-block-title {
+    font-size: 13px;
+    margin-bottom: 14px;
+  }
+  .ses-row {
+    font-size: 11.5px;
+    padding: 8px 0;
+  }
+  #toast {
+    bottom: 20px;
+    right: 20px;
+    left: 20px;
+    font-size: 13px;
+    padding: 12px 18px;
+  }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="save-bar">
+  <div class="save-bar-inner">
+    <button class="btn btn-success" onclick="saveSettings()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+      Save All Settings
+    </button>
+  </div>
+</div>
+
+<div class="settings-wrap">
+  <div class="content-inner">
+
+    <div class="page-title">Configuration</div>
+
+    <!-- MT5 Connection -->
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title-bar" style="background:linear-gradient(180deg,var(--purple),var(--blue))"></div>
+        <div class="panel-title">MT5 Connection</div>
+      </div>
+      <div class="panel-body">
+        <div class="form-row">
+          <div class="form-label">Login</div>
+          <input type="text" id="mt5_login" value="{{ settings.get('mt5_login','') }}" placeholder="12345678">
+        </div>
+        <div class="form-row">
+          <div class="form-label">Password</div>
+          <input type="password" id="mt5_password" value="{{ settings.get('mt5_password','') }}" placeholder="••••••••">
+        </div>
+        <div class="form-row">
+          <div class="form-label">Server</div>
+          <input type="text" id="mt5_server" value="{{ settings.get('mt5_server','') }}" placeholder="BrokerName-Live">
+        </div>
+        <div class="form-row">
+          <div>
+            <div class="form-label">MT5 Path</div>
+            <div class="form-hint">Optional — leave blank for auto-detect</div>
+          </div>
+          <input type="text" id="mt5_path" value="{{ settings.get('mt5_path','') }}" placeholder="C:\Program Files\MetaTrader 5\terminal64.exe">
+        </div>
+      </div>
+    </div>
+
+    <!-- Symbols -->
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title-bar" style="background:linear-gradient(180deg,var(--blue),var(--cyan))"></div>
+        <div class="panel-title">Traded Symbols</div>
+      </div>
+      <div class="panel-body">
+        <div class="form-row">
+          <div>
+            <div class="form-label">Symbols List</div>
+            <div class="form-hint">Select symbols from your broker's MT5 platform</div>
+          </div>
+          <div>
+            <div class="symbols-wrap" id="sym-list"></div>
+            <div class="sym-add">
+              <select id="sym-select" style="flex:1; max-width:220px;">
+                <option value="">Loading symbols...</option>
+              </select>
+              <button class="btn-add" onclick="addSymbol()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Add Symbol
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Risk & Trade Parameters -->
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title-bar" style="background:linear-gradient(180deg,var(--green),var(--cyan))"></div>
+        <div class="panel-title">Risk & Trade Parameters</div>
+      </div>
+      <div class="panel-body">
+        <div class="form-row">
+          <div>
+            <div class="form-label">Initial Account Balance</div>
+            <div class="form-hint">Fixed balance used for risk calculations (bot will always calculate lot sizes based on this amount, not current balance)</div>
+          </div>
+          <input type="number" id="initial_balance" value="{{ settings.get('initial_balance', 10000) }}" min="100" step="100">
+        </div>
+        <div class="form-row">
+          <div>
+            <div class="form-label">Risk per Trade (%)</div>
+            <div class="form-hint">% of initial balance</div>
+          </div>
+          <input type="number" id="risk_pct" value="{{ settings.get('risk_pct', 1.0) }}" min="0.1" max="10" step="0.1">
+        </div>
+        <div class="form-row">
+          <div class="form-label">Max Trades per Session</div>
+          <input type="number" id="max_trades_per_session" value="{{ settings.get('max_trades_per_session', 2) }}" min="1" max="10" step="1">
+        </div>
+        <div class="form-row">
+          <div class="form-label">TP Multiplier</div>
+          <input type="number" id="tp_multiplier" value="{{ settings.get('tp_multiplier', 10) }}" min="1" max="50" step="1">
+        </div>
+        <div class="form-row">
+          <div>
+            <div class="form-label">Poll Interval (seconds)</div>
+            <div class="form-hint">How often the bot checks for updates</div>
+          </div>
+          <input type="number" id="poll_interval" value="{{ settings.get('poll_interval', 10) }}" min="1" max="60" step="1">
+        </div>
+      </div>
+    </div>
+
+    <!-- Timezone -->
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title-bar" style="background:linear-gradient(180deg,var(--cyan),var(--blue))"></div>
+        <div class="panel-title">Broker Timezone</div>
+      </div>
+      <div class="panel-body">
+        <div class="form-row">
+          <div>
+            <div class="form-label">UTC Offset (hours)</div>
+            <div class="form-hint">UTC+2 → enter 2<br>UTC-5 → enter -5</div>
+          </div>
+          <div>
+            <input type="number" id="timezone_offset" value="{{ settings.get('timezone_offset', 0) }}" min="-12" max="14" step="1" oninput="updateTzPreview()">
+            <div id="tz-preview" style="margin-top:12px; font-size:12px; color:var(--cyan); font-family:'JetBrains Mono',monospace;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sessions -->
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title-bar" style="background:linear-gradient(180deg,var(--amber),#f87171)"></div>
+        <div class="panel-title">Trading Sessions (Broker Time)</div>
+      </div>
+      <div class="panel-body">
+        <div class="ses-grid">
+          {% set tky = settings.get('sessions', {}).get('tokyo', {}) %}
+          {% set ldn = settings.get('sessions', {}).get('london', {}) %}
+
+          <div class="ses-block">
+            <div class="ses-block-title">
+              <span style="background:#c084fc"></span>Tokyo Session
+            </div>
+            <div class="ses-row">
+              <span>Enabled</span>
+              <label class="toggle">
+                <input type="checkbox" id="tky-enabled" {% if tky.get('enabled', True) %}checked{% endif %}>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="ses-row">
+              <span>Start Time</span>
+              <input type="time" id="tky-start" value="{{ tky.get('start','00:00') }}">
+            </div>
+            <div class="ses-row">
+              <span>End Time</span>
+              <input type="time" id="tky-end" value="{{ tky.get('end','09:00') }}">
+            </div>
+          </div>
+
+          <div class="ses-block">
+            <div class="ses-block-title">
+              <span style="background:#60a5fa"></span>London Session
+            </div>
+            <div class="ses-row">
+              <span>Enabled</span>
+              <label class="toggle">
+                <input type="checkbox" id="ldn-enabled" {% if ldn.get('enabled', True) %}checked{% endif %}>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="ses-row">
+              <span>Start Time</span>
+              <input type="time" id="ldn-start" value="{{ ldn.get('start','07:00') }}">
+            </div>
+            <div class="ses-row">
+              <span>End Time</span>
+              <input type="time" id="ldn-end" value="{{ ldn.get('end','16:00') }}">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="toast"></div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let symbols = {{ settings.get('symbols', []) | tojson }};
+symbols = symbols.map(s => typeof s === 'object' ? s.name : s);
+
+let availableSymbols = [];
+
+// Load available symbols from MT5
+async function loadAvailableSymbols() {
+  try {
+    const r = await fetch('/backtest/symbols');
+    const j = await r.json();
+    availableSymbols = j.symbols || [];
+    
+    const sel = document.getElementById('sym-select');
+    if (availableSymbols.length > 0) {
+      sel.innerHTML = '<option value="">-- Select a symbol --</option>' + 
+        availableSymbols.map(s => `<option value="${s}">${s}</option>`).join('');
+    } else {
+      sel.innerHTML = '<option value="">No symbols available</option>';
+    }
+  } catch (e) {
+    const sel = document.getElementById('sym-select');
+    sel.innerHTML = '<option value="">Error loading symbols</option>';
+  }
+}
+
+loadAvailableSymbols();
+
+function renderSymbols() {
+  document.getElementById('sym-list').innerHTML = symbols.map((s, i) =>
+    `<span class="sym-tag">${s}<button onclick="removeSymbol(${i})">×</button></span>`
+  ).join('');
+}
+
+function addSymbol() {
+  const sel = document.getElementById('sym-select');
+  const v = sel.value.trim();
+  
+  if (!v) {
+    toast('⚠️ Please select a symbol from the dropdown', true);
+    return;
+  }
+  
+  if (symbols.includes(v)) {
+    toast('⚠️ Symbol already added', true);
+    sel.value = '';
+    return;
+  }
+  
+  symbols.push(v);
+  renderSymbols();
+  sel.value = '';
+  sel.focus();
+  toast(`✅ Added ${v} — Don't forget to Save!`, false);
+  highlightSaveButton();
+}
+
+function removeSymbol(i) {
+  const removed = symbols[i];
+  symbols.splice(i, 1);
+  renderSymbols();
+  toast(`🗑️ Removed ${removed} — Don't forget to Save!`, false);
+  highlightSaveButton();
+}
+
+function highlightSaveButton() {
+  const btn = document.querySelector('.btn-success');
+  btn.style.animation = 'pulse 1s ease-in-out 3';
+  setTimeout(() => {
+    btn.style.animation = '';
+  }, 3000);
+}
+
+async function saveSettings() {
+  const data = {
+    mt5_login: document.getElementById('mt5_login').value.trim(),
+    mt5_password: document.getElementById('mt5_password').value,
+    mt5_server: document.getElementById('mt5_server').value.trim(),
+    mt5_path: document.getElementById('mt5_path').value.trim(),
+    symbols: symbols,
+    initial_balance: parseFloat(document.getElementById('initial_balance').value) || 10000,
+    risk_pct: parseFloat(document.getElementById('risk_pct').value) || 1.0,
+    max_trades_per_session: parseInt(document.getElementById('max_trades_per_session').value) || 2,
+    tp_multiplier: parseInt(document.getElementById('tp_multiplier').value) || 10,
+    poll_interval: parseInt(document.getElementById('poll_interval').value) || 10,
+    timezone_offset: parseInt(document.getElementById('timezone_offset').value) || 0,
+    sessions: {
+      tokyo: {
+        enabled: document.getElementById('tky-enabled').checked,
+        start: document.getElementById('tky-start').value,
+        end: document.getElementById('tky-end').value
+      },
+      london: {
+        enabled: document.getElementById('ldn-enabled').checked,
+        start: document.getElementById('ldn-start').value,
+        end: document.getElementById('ldn-end').value
+      }
+    }
+  };
+
+  try {
+    const r = await fetch('/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    const j = await r.json();
+    
+    if (j.ok) {
+      if (j.restarted) {
+        toast('✅ Settings saved & bot restarted with new configuration', false);
+      } else {
+        toast('✅ Settings saved successfully', false);
+      }
+    } else {
+      toast('❌ ' + (j.msg || 'Failed to save'), true);
+    }
+  } catch (e) {
+    toast('❌ Network error. Please try again.', true);
+  }
+}
+
+function updateTzPreview() {
+  const offset = parseInt(document.getElementById('timezone_offset').value) || 0;
+  const now = new Date();
+  const brokerH = (now.getUTCHours() + offset + 24) % 24;
+  const brokerM = String(now.getUTCMinutes()).padStart(2, '0');
+  const sign = offset >= 0 ? '+' : '';
+  document.getElementById('tz-preview').textContent = 
+    `UTC${sign}${offset}  →  Current broker time: ${String(brokerH).padStart(2,'0')}:${brokerM}`;
+}
+updateTzPreview();
+setInterval(updateTzPreview, 10000);
+
+function toast(msg, isError = false) {
+  const el = document.getElementById('toast');
+  el.innerHTML = msg;
+  el.className = 'show' + (isError ? ' err' : '');
+  setTimeout(() => { el.className = ''; }, 2800);
+}
+
+// Initialize
+renderSymbols();
+</script>
+{% endblock %}

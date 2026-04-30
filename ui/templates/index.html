@@ -1,0 +1,982 @@
+{% extends "base.html" %}
+{% block title %}BOR Strategy — Live Dashboard{% endblock %}
+{% block page_label %}Live Dashboard{% endblock %}
+
+{% block extra_styles %}
+<style>
+/* ── ROOT & COLOR PALETTE ── */
+:root {
+  --bg: #0a0a0f;
+  --bg2: #111118;
+  --bg3: rgba(20, 20, 35, 0.92);
+  --border: rgba(120, 100, 255, 0.18);
+  --border-h: rgba(160, 130, 255, 0.45);
+  --purple: #a855f7;
+  --blue: #3b82f6;
+  --cyan: #22d3ee;
+  --green: #34d399;
+  --red: #f87171;
+  --amber: #fbbf24;
+  --fg: #e0e7ff;
+  --fg2: #a5b4fc;
+  --fg3: #818cf8;
+  --fg4: #c4c4ff;
+  --r: 18px;
+  --rx: 9999px;
+}
+
+/* ── PAGE BACKGROUND ── */
+.content {
+  padding: 32px 28px 50px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  min-height: 100vh;
+  background: transparent;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtle tech grid background */
+.content::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: 
+    linear-gradient(rgba(139, 92, 246, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139, 92, 246, 0.035) 1px, transparent 1px);
+  background-size: 45px 45px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── KPI ROW ── */
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 18px;
+  z-index: 2;
+}
+
+.kpi {
+  background: var(--bg3);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 24px 22px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.kpi::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, transparent, var(--purple), var(--cyan), transparent);
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.kpi:hover {
+  transform: translateY(-10px) scale(1.03);
+  border-color: var(--purple);
+  box-shadow: 0 25px 50px rgba(168, 85, 247, 0.28);
+}
+
+.kpi:hover::before {
+  opacity: 1;
+}
+
+.kpi-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--fg2);
+  text-transform: uppercase;
+  letter-spacing: 1.3px;
+  margin-bottom: 12px;
+}
+
+.kpi-val {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--fg);
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  letter-spacing: -0.6px;
+  line-height: 1;
+}
+
+.kpi-val.sm {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.kpi-val.green { 
+  color: var(--green); 
+  text-shadow: 0 0 20px rgba(52, 211, 153, 0.6); 
+}
+.kpi-val.red { 
+  color: var(--red); 
+  text-shadow: 0 0 20px rgba(248, 113, 113, 0.6); 
+}
+
+/* ── SESSIONS SECTION ── */
+.sessions {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 18px;
+  align-items: stretch;
+  z-index: 2;
+}
+
+.ses-card, .next-card {
+  background: var(--bg3);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 26px 24px;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.45);
+}
+
+.ses-card:hover, .next-card:hover {
+  border-color: var(--purple);
+  transform: translateY(-8px);
+  box-shadow: 0 25px 60px rgba(168, 85, 247, 0.25);
+}
+
+.ses-accent {
+  width: 6px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  box-shadow: 0 0 25px currentColor;
+}
+
+.ses-name {
+  font-family: 'Syne', system-ui, sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  color: #e0e7ff;
+}
+
+.ses-stats {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 20px;
+}
+
+.sk {
+  color: var(--fg2);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  align-self: center;
+}
+
+.sv {
+  color: var(--fg4);
+  font-size: 13px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+
+/* Next Session Card */
+.next-card {
+  min-width: 180px;
+  text-align: center;
+  background: linear-gradient(145deg, rgba(25, 20, 45, 0.95), rgba(15, 15, 30, 0.95));
+}
+
+.next-label {
+  font-size: 9.8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.6px;
+  color: var(--fg2);
+}
+
+.next-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 34px;
+  font-weight: 600;
+  color: var(--amber);
+  text-shadow: 0 0 30px rgba(251, 191, 36, 0.7);
+  margin: 10px 0 6px;
+}
+
+.next-name {
+  font-size: 12.5px;
+  color: var(--fg3);
+  font-weight: 500;
+}
+
+/* Pills */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 50px;
+  font-size: 10.2px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  transition: all 0.3s ease;
+}
+
+.pill-green {
+  background: rgba(52, 211, 153, 0.18);
+  color: var(--green);
+  border: 1px solid rgba(52, 211, 153, 0.5);
+  box-shadow: 0 0 15px rgba(52, 211, 153, 0.4);
+}
+
+.pill-red {
+  background: rgba(248, 113, 113, 0.18);
+  color: var(--red);
+  border: 1px solid rgba(248, 113, 113, 0.5);
+}
+
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  animation: pulse 2s infinite ease-in-out;
+}
+
+.dot-green { background: var(--green); box-shadow: 0 0 12px var(--green); }
+.dot-red   { background: var(--red);   box-shadow: 0 0 12px var(--red); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
+
+/* ── TABLES & PANELS ── */
+.panel, .log-panel {
+  background: var(--bg3);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+  z-index: 2;
+}
+
+.panel-head, .log-head {
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,0.035);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.panel-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--fg2);
+  text-transform: uppercase;
+  letter-spacing: 1.1px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.panel-title-bar {
+  width: 4px;
+  height: 18px;
+  border-radius: 4px;
+}
+
+.tbl-wrap {
+  max-height: 290px;
+  overflow: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th {
+  background: rgba(255,255,255,0.045);
+  color: var(--fg2);
+  padding: 13px 14px;
+  font-size: 9.8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.9px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  border-bottom: 1px solid var(--border);
+}
+
+td {
+  padding: 13px 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.2px;
+  color: var(--fg3);
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  transition: all 0.25s ease;
+}
+
+tr:hover td {
+  background: rgba(168, 85, 247, 0.09);
+  color: var(--fg);
+}
+
+/* Price movement colors */
+.t-pos { color: var(--green); }
+.t-neg { color: var(--red); }
+.t-buy { color: var(--cyan); }
+.t-sell { color: var(--amber); }
+.t-win { color: var(--green); font-weight: 600; }
+.t-loss { color: var(--red); font-weight: 600; }
+.t-neutral { color: var(--fg3); font-weight: 600; }
+.t-sym { font-weight: 600; color: var(--fg); }
+
+/* Live price pulse animation */
+@keyframes priceUpdate {
+  0% { background: rgba(168, 85, 247, 0.3); transform: scale(1.05); }
+  100% { background: transparent; transform: scale(1); }
+}
+
+.price-updated {
+  animation: priceUpdate 0.5s ease-out;
+}
+
+/* Log */
+#log-box {
+  height: 210px;
+  overflow-y: auto;
+  padding: 18px 22px;
+  background: var(--bg2);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11.3px;
+  line-height: 1.9;
+  color: var(--fg3);
+}
+
+.l-info  { color: var(--fg2); }
+.l-error { color: var(--red); }
+.l-warn  { color: var(--amber); }
+.l-order { color: var(--green); }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 1150px) {
+  .kpi-row { 
+    grid-template-columns: repeat(3, 1fr); 
+    gap: 16px;
+  }
+  .sessions { 
+    grid-template-columns: 1fr; 
+    gap: 16px;
+  }
+  .next-card { 
+    min-width: auto; 
+  }
+}
+
+@media (max-width: 920px) {
+  .content { 
+    padding: 24px 18px 40px; 
+    gap: 24px; 
+  }
+  .kpi-row { 
+    grid-template-columns: repeat(2, 1fr); 
+    gap: 14px;
+  }
+  .sessions { 
+    grid-template-columns: 1fr; 
+  }
+  .tables { 
+    grid-template-columns: 1fr !important; 
+    gap: 16px;
+  }
+}
+
+@media (max-width: 680px) {
+  .content { 
+    padding: 18px 14px 36px; 
+    gap: 20px; 
+  }
+  
+  /* KPI Cards */
+  .kpi-row { 
+    grid-template-columns: 1fr; 
+    gap: 12px; 
+  }
+  .kpi { 
+    padding: 18px 16px; 
+  }
+  .kpi-label { 
+    font-size: 9.5px; 
+    margin-bottom: 10px;
+  }
+  .kpi-val { 
+    font-size: 24px; 
+  }
+  .kpi-val.sm { 
+    font-size: 14px; 
+  }
+  
+  /* Sessions */
+  .sessions {
+    gap: 14px;
+  }
+  .ses-card, .next-card { 
+    padding: 20px 18px; 
+  }
+  .ses-name { 
+    font-size: 16px;
+    margin-bottom: 16px;
+  }
+  .ses-stats { 
+    gap: 7px 16px; 
+  }
+  .sk { 
+    font-size: 9px; 
+  }
+  .sv { 
+    font-size: 11.5px; 
+  }
+  
+  /* Next Session */
+  .next-val {
+    font-size: 30px;
+  }
+  .next-label {
+    font-size: 9px;
+  }
+  .next-name {
+    font-size: 11.5px;
+  }
+  
+  /* Tables */
+  .panel-head, .log-head { 
+    padding: 13px 16px; 
+  }
+  .panel-title { 
+    font-size: 10px; 
+  }
+  .panel-title-bar {
+    width: 3px;
+    height: 16px;
+  }
+  
+  /* Make tables scroll horizontally */
+  .tbl-wrap { 
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  table { 
+    min-width: 700px; 
+  }
+  th { 
+    padding: 10px 9px; 
+    font-size: 9px; 
+    white-space: nowrap;
+  }
+  td { 
+    padding: 10px 9px; 
+    font-size: 11px; 
+    white-space: nowrap;
+  }
+  
+  /* Log */
+  #log-box { 
+    height: 180px; 
+    padding: 14px 16px; 
+    font-size: 10.5px; 
+  }
+}
+
+@media (max-width: 480px) {
+  .content { 
+    padding: 14px 10px 32px; 
+    gap: 16px; 
+  }
+  
+  /* KPI Cards - More compact */
+  .kpi-row { 
+    gap: 10px; 
+  }
+  .kpi { 
+    padding: 16px 14px; 
+  }
+  .kpi-label { 
+    font-size: 9px;
+    margin-bottom: 8px;
+  }
+  .kpi-val { 
+    font-size: 22px; 
+  }
+  .kpi-val.sm { 
+    font-size: 13px; 
+  }
+  .kpi:hover {
+    transform: translateY(-5px) scale(1.01);
+  }
+  
+  /* Sessions - Stack everything */
+  .sessions {
+    gap: 12px;
+  }
+  .ses-card, .next-card { 
+    padding: 16px 14px; 
+  }
+  .ses-name { 
+    font-size: 15px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .pill {
+    font-size: 9px;
+    padding: 4px 10px;
+  }
+  .ses-stats {
+    gap: 6px 12px;
+  }
+  .sk {
+    font-size: 8.5px;
+  }
+  .sv {
+    font-size: 11px;
+  }
+  
+  /* Next Session */
+  .next-val {
+    font-size: 26px;
+    margin: 8px 0 4px;
+  }
+  .next-label {
+    font-size: 8.5px;
+  }
+  .next-name {
+    font-size: 11px;
+  }
+  
+  /* Tables - Very compact */
+  .panel-head, .log-head { 
+    padding: 11px 12px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .panel-title { 
+    font-size: 9.5px; 
+  }
+  .cnt {
+    font-size: 9px !important;
+    padding: 3px 10px !important;
+  }
+  
+  table { 
+    min-width: 650px; 
+  }
+  th { 
+    padding: 9px 7px; 
+    font-size: 8.5px; 
+  }
+  td { 
+    padding: 9px 7px; 
+    font-size: 10.5px; 
+  }
+  
+  /* Log */
+  #log-box { 
+    height: 160px; 
+    padding: 12px 12px; 
+    font-size: 10px;
+    line-height: 1.7;
+  }
+  
+  /* Reduce hover effects on mobile */
+  .panel:hover,
+  .log-panel:hover,
+  .ses-card:hover,
+  .next-card:hover {
+    transform: translateY(-4px);
+  }
+}
+
+@media (max-width: 380px) {
+  .content { 
+    padding: 12px 8px 28px; 
+    gap: 14px; 
+  }
+  
+  .kpi { 
+    padding: 14px 12px; 
+  }
+  .kpi-val { 
+    font-size: 20px; 
+  }
+  .kpi-val.sm { 
+    font-size: 12px; 
+  }
+  
+  .ses-card, .next-card { 
+    padding: 14px 12px; 
+  }
+  
+  table { 
+    min-width: 600px; 
+  }
+  th { 
+    padding: 8px 6px; 
+    font-size: 8px; 
+  }
+  td { 
+    padding: 8px 6px; 
+    font-size: 10px; 
+  }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="content">
+
+  <!-- KPI CARDS -->
+  <div class="kpi-row">
+    <div class="kpi">
+      <div class="kpi-label">Account</div>
+      <div class="kpi-val sm" id="c-account">—</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Balance</div>
+      <div class="kpi-val" id="c-balance">—</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Equity</div>
+      <div class="kpi-val" id="c-equity">—</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Server</div>
+      <div class="kpi-val sm" id="c-server">—</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Last Update</div>
+      <div class="kpi-val sm" id="c-update">—</div>
+    </div>
+  </div>
+
+  <!-- SESSIONS -->
+  <div class="sessions">
+    <div class="ses-card">
+      <div class="ses-accent" style="background:linear-gradient(180deg,#c084fc,#7c3aed)"></div>
+      <div class="ses-body">
+        <div class="ses-name" style="color:#c4b5fd">
+          Tokyo
+          <span id="tky-badge" class="pill pill-red">
+            <span class="dot dot-red" id="tky-dot"></span>
+            <span id="tky-txt">Inactive</span>
+          </span>
+        </div>
+        <div class="ses-stats">
+          <span class="sk" title="Total trades opened in this session across all pairs">Trades</span><span class="sv" id="tky-trades">0</span>
+          <span class="sk" title="Wins / Losses (closed trades only)">W / L</span><span class="sv" id="tky-wl">0 / 0</span>
+          <span class="sk" title="BOR levels (S1=highest, S4=lowest)">Levels</span><span class="sv" id="tky-levels" style="font-size:10px;line-height:1.6;">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="ses-card">
+      <div class="ses-accent" style="background:linear-gradient(180deg,#60a5fa,#1e40af)"></div>
+      <div class="ses-body">
+        <div class="ses-name" style="color:#93c5fd">
+          London
+          <span id="ldn-badge" class="pill pill-red">
+            <span class="dot dot-red" id="ldn-dot"></span>
+            <span id="ldn-txt">Inactive</span>
+          </span>
+        </div>
+        <div class="ses-stats">
+          <span class="sk" title="Total trades opened in this session across all pairs">Trades</span><span class="sv" id="ldn-trades">0</span>
+          <span class="sk" title="Wins / Losses (closed trades only)">W / L</span><span class="sv" id="ldn-wl">0 / 0</span>
+          <span class="sk" title="BOR levels (S1=highest, S4=lowest)">Levels</span><span class="sv" id="ldn-levels" style="font-size:10px;line-height:1.6;">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="next-card">
+      <div class="next-label">Next Session</div>
+      <div class="next-val" id="next-cd">—</div>
+      <div class="next-name" id="next-name">Calculating…</div>
+    </div>
+  </div>
+
+
+
+  <!-- TABLES -->
+  <div class="tables" style="display: grid; grid-template-columns: 1fr 1fr; gap: 18px; z-index: 2;">
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">
+          <div class="panel-title-bar" style="background:linear-gradient(180deg,var(--purple),var(--blue))"></div>
+          Open Trades
+        </div>
+        <span class="cnt" id="open-count" style="font-size:10px; font-weight:700; padding:4px 12px; border-radius:999px; background:rgba(255,255,255,0.08); color:var(--fg2);">0</span>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Symbol</th><th>Dir</th><th>Session</th>
+              <th>Entry</th><th>Current</th><th>SL</th><th>TP</th><th>Lot</th><th>P&L</th><th>Time</th>
+            </tr>
+          </thead>
+          <tbody id="open-tbody">
+            <tr class="t-empty"><td colspan="10">No open trades</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">
+          <div class="panel-title-bar" style="background:linear-gradient(180deg,var(--green),var(--cyan))"></div>
+          Trade History
+        </div>
+        <span class="cnt" id="hist-count" style="font-size:10px; font-weight:700; padding:4px 12px; border-radius:999px; background:rgba(255,255,255,0.08); color:var(--fg2);">0</span>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Symbol</th><th>Dir</th><th>Session</th>
+              <th>Entry</th><th>SL</th><th>TP</th><th>Result</th><th>Time</th>
+            </tr>
+          </thead>
+          <tbody id="hist-tbody">
+            <tr class="t-empty"><td colspan="8">No history yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOG -->
+  <div class="log-panel">
+    <div class="log-head">
+      <div class="log-title">
+        <div class="panel-title-bar" style="background:linear-gradient(180deg,var(--green),var(--cyan))"></div>
+        Activity Log
+      </div>
+      <label class="log-toggle" style="font-size:10.5px; color:var(--fg2); cursor:pointer; user-select:none;">
+        <input type="checkbox" id="autoscroll" checked> Auto-scroll
+      </label>
+    </div>
+    <div id="log-box"><div class="l-info">Waiting for connection…</div></div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let _sessionStarts = [{name:'Tokyo',h:0,m:0},{name:'London',h:7,m:0}];
+
+
+function nextSession() {
+  const now = new Date();
+  let best = null, bestDiff = Infinity;
+  for (const s of _sessionStarts) {
+    let t = new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate(),s.h,s.m));
+    if (t <= now) t = new Date(t.getTime() + 86400000);
+    const diff = t - now;
+    if (diff < bestDiff) { bestDiff = diff; best = s; }
+  }
+  const h = Math.floor(bestDiff/3600000);
+  const m = Math.floor((bestDiff%3600000)/60000);
+  const sec = Math.floor((bestDiff%60000)/1000);
+  const p = v => String(v).padStart(2,'0');
+  document.getElementById('next-cd').textContent = `${p(h)}:${p(m)}:${p(sec)}`;
+  document.getElementById('next-name').textContent = best ? best.name : '';
+}
+setInterval(nextSession, 1000);
+nextSession();
+
+const $ = id => document.getElementById(id);
+const fmt = (v, d=5) => typeof v==='number' ? v.toFixed(d) : (v ?? '—');
+const fmtMoney = v => (v>=0?'+$':'-$') + Math.abs(v).toFixed(2);
+
+// Track previous prices for animation
+let _prevPrices = {};
+
+function setSes(pfx, active) {
+  const badge = $(pfx+'-badge');
+  const dot = $(pfx+'-dot');
+  const txt = $(pfx+'-txt');
+  
+  if (active) {
+    badge.className = 'pill pill-green';
+    dot.className = 'dot dot-green';
+    txt.textContent = 'Active';
+  } else {
+    badge.className = 'pill pill-red';
+    dot.className = 'dot dot-red';
+    txt.textContent = 'Inactive';
+  }
+}
+
+async function refresh() {
+  let s;
+  try { 
+    s = await fetch('/state').then(r => r.json()); 
+  } catch(e) { 
+    console.log("Failed to fetch state");
+    return; 
+  }
+
+  if (s.session_starts_utc) {
+    _sessionStarts = [
+      {name:'Tokyo',  h:s.session_starts_utc.tokyo.h,  m:s.session_starts_utc.tokyo.m},
+      {name:'London', h:s.session_starts_utc.london.h, m:s.session_starts_utc.london.m}
+    ];
+  }
+
+  $('c-account').textContent = s.account || '—';
+  $('c-balance').textContent = s.balance != null 
+    ? '$' + s.balance.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
+  
+  const eq = s.equity, bal = s.balance;
+  $('c-equity').textContent = eq != null 
+    ? '$' + eq.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
+  $('c-equity').className = 'kpi-val' + (eq != null ? (eq >= bal ? ' green' : ' red') : '');
+
+  $('c-server').textContent = s.server || '—';
+  $('c-update').textContent = s.last_update || '—';
+
+  const ses = s.sessions || {};
+  for (const [key, pfx] of [['tokyo','tky'],['london','ldn']]) {
+    const d = ses[key] || {};
+    setSes(pfx, d.active);
+    $(pfx+'-trades').textContent = d.trades ?? 0;
+    $(pfx+'-wl').textContent = (d.wins??0)+' / '+(d.losses??0);
+    // Display levels with line breaks for multiple symbols
+    const levelsEl = $(pfx+'-levels');
+    if (d.levels && d.levels !== '—') {
+      levelsEl.innerHTML = d.levels.split('\n').join('<br>');
+      levelsEl.style.fontSize = '10px';
+      levelsEl.style.lineHeight = '1.6';
+    } else {
+      levelsEl.textContent = '—';
+    }
+  }
+
+  // Open Trades with live price tracking
+  const open = s.open_trades || [];
+  $('open-count').textContent = open.length;
+  
+  // Debug: Log exact data being displayed
+  if (open.length > 0) {
+    console.log('Open Trades Data:', open.map(t => ({
+      ticket: t.ticket,
+      symbol: t.symbol,
+      lot: t.lot,
+      entry: t.entry,
+      sl: t.sl,
+      tp: t.tp
+    })));
+  }
+  
+  $('open-tbody').innerHTML = open.length === 0 
+    ? '<tr class="t-empty"><td colspan="10">No open trades</td></tr>'
+    : open.map((t, idx) => {
+        const pnl = t.pnl || 0;
+        const current = t.current_price || 0;
+        const entry = t.entry || 0;
+        const priceMove = current - entry;
+        const priceMoveClass = priceMove >= 0 ? 't-pos' : 't-neg';
+        
+        // Check if price changed
+        const priceKey = `${t.ticket}_${idx}`;
+        const prevPrice = _prevPrices[priceKey];
+        const priceChanged = prevPrice !== undefined && prevPrice !== current;
+        _prevPrices[priceKey] = current;
+        
+        const priceClass = priceChanged ? 'price-updated' : '';
+        
+        return `<tr>
+          <td class="t-sym">${t.symbol}</td>
+          <td class="${t.direction==='buy'?'t-buy':'t-sell'}">${t.direction.toUpperCase()}</td>
+          <td>${t.session}</td>
+          <td>${fmt(entry)}</td>
+          <td class="${priceMoveClass} ${priceClass}" style="font-weight:700;">${fmt(current)}</td>
+          <td>${fmt(t.sl)}</td>
+          <td>${fmt(t.tp)}</td>
+          <td>${t.lot.toFixed(2)}</td>
+          <td class="${pnl>=0?'t-pos':'t-neg'} ${priceClass}" style="font-weight:700;">${fmtMoney(pnl)}</td>
+          <td>${t.time}</td>
+        </tr>`;
+      }).join('');
+
+  // Trade History
+  const hist = (s.trade_history || []).slice().reverse();
+  $('hist-count').textContent = hist.length;
+  $('hist-tbody').innerHTML = hist.length === 0 
+    ? '<tr class="t-empty"><td colspan="8">No history yet</td></tr>'
+    : hist.map(t => {
+        const reason = t.close_reason || 'closed';
+        const isTP = reason === 'tp';
+        const isSL = reason === 'sl';
+        let resultText = '';
+        let resultClass = '';
+        
+        if (isTP) {
+          resultText = '✓ TP';
+          resultClass = 't-win';
+        } else if (isSL) {
+          resultText = '✗ SL';
+          resultClass = 't-loss';
+        } else {
+          resultText = '◆ CLOSED';
+          resultClass = 't-neutral';
+        }
+        
+        return `<tr>
+          <td class="t-sym">${t.symbol}</td>
+          <td class="${t.direction==='buy'?'t-buy':'t-sell'}">${t.direction.toUpperCase()}</td>
+          <td>${t.session}</td>
+          <td>${fmt(t.entry)}</td>
+          <td>${fmt(t.sl)}</td>
+          <td>${fmt(t.tp)}</td>
+          <td class="${resultClass}">${resultText}</td>
+          <td>${t.time}</td>
+        </tr>`;
+      }).join('');
+
+  // Activity Log
+  const logBox = $('log-box');
+  logBox.innerHTML = (s.logs || []).map(line => {
+    let cls = 'l-info';
+    if (line.includes('ERROR')) cls = 'l-error';
+    else if (line.includes('WARNING')) cls = 'l-warn';
+    else if (line.includes('Order') || line.includes('Connected')) cls = 'l-order';
+    return `<div class="${cls}">${line}</div>`;
+  }).join('');
+
+  if ($('autoscroll').checked) {
+    logBox.scrollTop = logBox.scrollHeight;
+  }
+}
+
+setInterval(refresh, 1000);  // Update every 1 second for live price tracking
+refresh();
+</script>
+{% endblock %}
