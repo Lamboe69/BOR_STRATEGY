@@ -23,16 +23,6 @@ wheels/
 .installed.cfg
 *.egg
 
-# Database files (contains sensitive trading data)
-*.db
-*.db.json
-bor_trades.db.json
-performance_history.json
-bor_settings.json
-
-# Sensitive configuration
-config/settings.py
-
 # IDE
 .vscode/
 .idea/
