@@ -1,43 +1,17 @@
 {
   "open_trades": {
-    "2694998272": {
-      "ticket": 2694998272,
-      "symbol": "USTECm",
-      "direction": "buy",
-      "session": "london",
-      "entry": 27255.57,
-      "sl": 27193.6,
-      "tp": 27875.27,
-      "lot": 3.23,
-      "time": "2026-04-30 15:00",
-      "pnl": 0.0,
-      "last_updated": "2026-04-30T15:15:00.295257"
-    },
-    "2695556237": {
-      "ticket": 2695556237,
-      "symbol": "USTECm",
-      "direction": "buy",
-      "session": "london",
-      "entry": 27345.37,
-      "sl": 27292.65,
-      "tp": 27872.57,
-      "lot": 3.79,
-      "time": "2026-04-30 17:15",
-      "pnl": 0.0,
-      "last_updated": "2026-04-30T17:30:00.690535"
-    },
-    "2696606162": {
-      "ticket": 2696606162,
+    "2698051993": {
+      "ticket": 2698051993,
       "symbol": "XAUUSDm",
-      "direction": "sell",
-      "session": "tokyo",
-      "entry": 4619.776,
-      "sl": 4625.566,
-      "tp": 4561.876,
-      "lot": 0.01,
-      "time": "2026-05-01 04:15",
+      "direction": "buy",
+      "session": "london",
+      "entry": 4572.147,
+      "sl": 4568.979,
+      "tp": 4603.827,
+      "lot": 0.05,
+      "time": "2026-05-01 11:30",
       "pnl": 0.0,
-      "last_updated": "2026-05-01T04:30:14.974027"
+      "last_updated": "2026-05-01T11:45:02.511784"
     }
   },
   "closed_trades": [
@@ -736,6 +710,70 @@
       "close_price": 4620.047,
       "actual_pnl": -7.97,
       "closed_at": "2026-04-30T20:01:12.696167"
+    },
+    {
+      "ticket": 2694998272,
+      "symbol": "USTECm",
+      "direction": "buy",
+      "session": "london",
+      "entry": 27255.57,
+      "sl": 27193.6,
+      "tp": 27875.27,
+      "lot": 3.23,
+      "time": "2026-04-30 15:00",
+      "pnl": 0.0,
+      "last_updated": "2026-04-30T15:15:00.295257",
+      "closed_at": "2026-05-01T05:39:17.003057",
+      "close_reason": "closed_by_broker"
+    },
+    {
+      "ticket": 2696606162,
+      "symbol": "XAUUSDm",
+      "direction": "sell",
+      "session": "tokyo",
+      "entry": 4619.776,
+      "sl": 4625.566,
+      "tp": 4561.876,
+      "lot": 0.01,
+      "time": "2026-05-01 04:15",
+      "pnl": 0.0,
+      "last_updated": "2026-05-01T04:30:14.974027",
+      "close_reason": "closed",
+      "close_price": 4609.841,
+      "actual_pnl": 8.43,
+      "closed_at": "2026-05-01T05:39:18.234011"
+    },
+    {
+      "ticket": 2695556237,
+      "symbol": "USTECm",
+      "direction": "buy",
+      "session": "london",
+      "entry": 27345.37,
+      "sl": 27292.65,
+      "tp": 27872.57,
+      "lot": 3.79,
+      "time": "2026-04-30 17:15",
+      "pnl": 0.0,
+      "last_updated": "2026-04-30T17:30:00.690535",
+      "closed_at": "2026-05-01T05:39:18.254618",
+      "close_reason": "closed_by_broker"
+    },
+    {
+      "ticket": 2696760202,
+      "symbol": "XAUUSDm",
+      "direction": "sell",
+      "session": "tokyo",
+      "entry": 4607.377,
+      "sl": 4611.447,
+      "tp": 4566.677,
+      "lot": 0.04,
+      "time": "2026-05-01 05:45",
+      "pnl": 0.0,
+      "last_updated": "2026-05-01T06:00:02.966072",
+      "close_reason": "closed",
+      "close_price": 4607.377,
+      "actual_pnl": 0.0,
+      "closed_at": "2026-05-01T08:33:47.160261"
     }
   ],
   "version": "1.0",
@@ -744,12 +782,12 @@
       "tokyo": {
         "wins": 0,
         "losses": 0,
-        "trade_count": 1
+        "trade_count": 0
       },
       "london": {
         "wins": 0,
         "losses": 7,
-        "trade_count": 2
+        "trade_count": 1
       }
     },
     "US30m": {

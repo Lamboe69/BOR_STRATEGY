@@ -719,13 +719,22 @@ def backtest_run():
                     order_cancelled = False
                     cancel_reason = ""
                     
+                    def _check_session(dt_obj, start_tuple, end_tuple):
+                        """Helper to check if time is in session."""
+                        t = dt_obj.hour * 60 + dt_obj.minute
+                        s = start_tuple[0] * 60 + start_tuple[1]
+                        e = end_tuple[0] * 60 + end_tuple[1]
+                        if s < e:
+                            return s <= t < e
+                        return t >= s or t < e
+                    
                     for j in range(i+1, min(i+50, len(bars))):  # check next 50 bars
                         future_bar = bars[j]
                         future_time = future_bar["time"]
                         
                         # Check session status at this future time
-                        future_tky_active = _in_session(future_time.hour * 60 + future_time.minute, tky_s, tky_e)
-                        future_ldn_active = _in_session(future_time.hour * 60 + future_time.minute, ldn_s, ldn_e)
+                        future_tky_active = _check_session(future_time, tky_s, tky_e)
+                        future_ldn_active = _check_session(future_time, ldn_s, ldn_e)
                         
                         # Check if order should be cancelled due to session end
                         if signal_session == "tokyo":

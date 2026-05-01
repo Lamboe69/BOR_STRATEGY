@@ -7,8 +7,8 @@
     "XAUUSDm",
     "US30m"
   ],
-  "initial_balance": 10000,
-  "risk_pct": 2,
+  "initial_balance": 1000,
+  "risk_pct": 1.5,
   "max_trades_per_session": 2,
   "tp_multiplier": 10,
   "poll_interval": 1,
