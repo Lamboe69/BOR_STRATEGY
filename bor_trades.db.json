@@ -13,18 +13,31 @@
       "pnl": 0.0,
       "last_updated": "2026-04-30T15:15:00.295257"
     },
-    "2695068982": {
-      "ticket": 2695068982,
-      "symbol": "USOILm",
-      "direction": "sell",
+    "2695556237": {
+      "ticket": 2695556237,
+      "symbol": "USTECm",
+      "direction": "buy",
       "session": "london",
-      "entry": 101.684,
-      "sl": 102.06,
-      "tp": 97.924,
-      "lot": 0.53,
-      "time": "2026-04-30 15:15",
+      "entry": 27345.37,
+      "sl": 27292.65,
+      "tp": 27872.57,
+      "lot": 3.79,
+      "time": "2026-04-30 17:15",
       "pnl": 0.0,
-      "last_updated": "2026-04-30T15:30:01.326425"
+      "last_updated": "2026-04-30T17:30:00.690535"
+    },
+    "2696606162": {
+      "ticket": 2696606162,
+      "symbol": "XAUUSDm",
+      "direction": "sell",
+      "session": "tokyo",
+      "entry": 4619.776,
+      "sl": 4625.566,
+      "tp": 4561.876,
+      "lot": 0.01,
+      "time": "2026-05-01 04:15",
+      "pnl": 0.0,
+      "last_updated": "2026-05-01T04:30:14.974027"
     }
   },
   "closed_trades": [
@@ -589,6 +602,140 @@
       "close_price": 4611.248,
       "actual_pnl": -3.59,
       "closed_at": "2026-04-30T16:33:12.665962"
+    },
+    {
+      "ticket": 2695068982,
+      "symbol": "USOILm",
+      "direction": "sell",
+      "session": "london",
+      "entry": 101.684,
+      "sl": 102.06,
+      "tp": 97.924,
+      "lot": 0.53,
+      "time": "2026-04-30 15:15",
+      "pnl": 0.0,
+      "last_updated": "2026-04-30T15:30:01.326425",
+      "close_reason": "sl",
+      "close_price": 102.06,
+      "actual_pnl": -429.3,
+      "closed_at": "2026-04-30T16:52:51.021967"
+    },
+    {
+      "ticket": 2695442066,
+      "symbol": "USOILm",
+      "direction": "buy",
+      "session": "london",
+      "entry": 101.742,
+      "sl": 101.605,
+      "tp": 103.112,
+      "lot": 0.01,
+      "time": "2026-04-30 16:45",
+      "pnl": 0.0,
+      "last_updated": "2026-04-30T17:00:01.455101",
+      "close_reason": "sl",
+      "close_price": 101.605,
+      "actual_pnl": -1.56,
+      "closed_at": "2026-04-30T17:00:18.177460"
+    },
+    {
+      "ticket": 2695645099,
+      "symbol": "USOILm",
+      "direction": "sell",
+      "session": "london",
+      "entry": 100.943,
+      "sl": 101.523,
+      "tp": 95.143,
+      "lot": 0.01,
+      "time": "2026-04-30 17:45",
+      "pnl": 0.0,
+      "last_updated": "2026-04-30T17:59:59.602832",
+      "close_reason": "sl",
+      "close_price": 101.523,
+      "actual_pnl": -7.83,
+      "closed_at": "2026-04-30T18:23:53.487196"
+    },
+    {
+      "ticket": 2695606298,
+      "symbol": "US30m",
+      "direction": "buy",
+      "session": "london",
+      "entry": 49613.8,
+      "sl": 49599.8,
+      "tp": 49753.8,
+      "lot": 14.290000000000001,
+      "time": "2026-04-30 17:30",
+      "pnl": 0.0,
+      "last_updated": "2026-04-30T17:44:59.945988",
+      "close_reason": "tp",
+      "close_price": 49753.8,
+      "actual_pnl": 1666.21,
+      "closed_at": "2026-04-30T18:40:11.250229"
+    },
+    {
+      "ticket": 2695739885,
+      "symbol": "USOILm",
+      "direction": "buy",
+      "session": "london",
+      "entry": 102.125,
+      "sl": 101.761,
+      "tp": 105.765,
+      "lot": 0.01,
+      "time": "2026-04-30 18:15",
+      "pnl": 0.0,
+      "last_updated": "2026-04-30T18:29:59.607097",
+      "closed_at": "2026-04-30T19:13:19.806173",
+      "close_reason": "closed_by_broker"
+    },
+    {
+      "ticket": 2695695340,
+      "symbol": "XAUUSDm",
+      "direction": "buy",
+      "session": "london",
+      "entry": 4619.881,
+      "sl": 4617.715,
+      "tp": 4641.541,
+      "lot": 0.01,
+      "time": "2026-04-30 18:00",
+      "pnl": 0.0,
+      "last_updated": "2026-04-30T18:15:00.339685",
+      "close_reason": "sl",
+      "close_price": 4617.715,
+      "actual_pnl": -3.26,
+      "closed_at": "2026-04-30T19:21:12.066151"
+    },
+    {
+      "ticket": 2695914891,
+      "symbol": "XAUUSDm",
+      "direction": "sell",
+      "session": "london",
+      "entry": 4618.982,
+      "sl": 4620.047,
+      "tp": 4608.332,
+      "lot": 0.02,
+      "time": "2026-04-30 19:15",
+      "pnl": 0.0,
+      "last_updated": "2026-04-30T19:30:00.777169",
+      "close_reason": "sl",
+      "close_price": 4620.047,
+      "actual_pnl": -4.64,
+      "closed_at": "2026-04-30T19:38:46.784673"
+    },
+    {
+      "ticket": 2696004174,
+      "symbol": "XAUUSDm",
+      "direction": "sell",
+      "session": "london",
+      "entry": 4618.982,
+      "sl": 4620.047,
+      "tp": 4608.332,
+      "lot": 0.02,
+      "time": "2026-04-30 19:45",
+      "pnl": 0.0,
+      "last_updated": "2026-04-30T20:00:00.291672",
+      "close_reason": "sl",
+      "close_price": 4620.047,
+      "actual_pnl": -7.97,
+      "closed_at": "2026-04-30T20:01:12.696167"
     }
   ],
   "version": "1.0",
@@ -596,21 +743,23 @@
     "XAUUSDm": {
       "tokyo": {
         "wins": 0,
-        "losses": 0
+        "losses": 0,
+        "trade_count": 1
       },
       "london": {
         "wins": 0,
-        "losses": 4,
-        "trade_count": 1
+        "losses": 7,
+        "trade_count": 2
       }
     },
     "US30m": {
       "tokyo": {
         "wins": 0,
-        "losses": 0
+        "losses": 0,
+        "trade_count": 0
       },
       "london": {
-        "wins": 0,
+        "wins": 1,
         "losses": 2,
         "trade_count": 0
       }
@@ -623,7 +772,7 @@
       "london": {
         "wins": 0,
         "losses": 2,
-        "trade_count": 0
+        "trade_count": 1
       }
     },
     "USOILm": {
@@ -634,8 +783,8 @@
       },
       "london": {
         "wins": 0,
-        "losses": 1,
-        "trade_count": 0
+        "losses": 4,
+        "trade_count": 2
       }
     }
   }

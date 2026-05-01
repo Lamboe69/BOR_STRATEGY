@@ -5,9 +5,7 @@
   "mt5_path": "",
   "symbols": [
     "XAUUSDm",
-    "US30m",
-    "USTECm",
-    "USOILm"
+    "US30m"
   ],
   "initial_balance": 10000,
   "risk_pct": 2,
@@ -24,7 +22,7 @@
     "london": {
       "enabled": true,
       "start": "14:00",
-      "end": "23:00"
+      "end": "20:00"
     }
   }
 }
