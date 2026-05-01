@@ -216,29 +216,30 @@ def calc_lot(symbol: str, entry: float, sl: float) -> float:
         log.info("%s lot calc: risk=$%.2f sl_dist=%.5f pips=%.2f pip_val=$%.2f → lot=%.2f",
                  symbol, risk_usd, sl_distance, pips_in_sl, pip_value_per_lot, lot)
     else:
-        # For indices/commodities, use point value calculation
-        # Point value = tick_value / tick_size (value per 1.0 price movement)
-        point_value = tick_value / tick_size if tick_size > 0 else tick_value
+        # For indices/commodities (XAUUSD, USTEC, US30, etc.)
+        # Formula: lot = risk_usd / (sl_distance × tick_value / tick_size)
         
-        # For USTEC/NAS100: typical values are
-        # tick_size = 0.01, tick_value = 0.01 USD per contract
-        # So point_value = 0.01 / 0.01 = 1.0 USD per point per contract
-        # But we need to account for contract size
-        
-        # Get contract size (for indices, this is usually 1)
+        # Get contract size
         contract_size = sym_info.trade_contract_size
         
-        # Calculate value per point for 1 lot
-        # For USTEC: 1 lot = 1 contract, 1 point = $1
-        value_per_point = point_value * contract_size
+        # For gold: tick_size=0.01, tick_value=0.01 USD, contract_size=100
+        # 1 lot = 100 oz, $1 move = $100 per lot
+        # For USTEC: tick_size=0.01, tick_value=0.01 USD, contract_size=1
+        # 1 lot = 1 contract, 1 point = $1 per lot
+        
+        # Calculate value per 1.0 price unit (e.g., $1 for gold, 1 point for indices)
+        if tick_size > 0:
+            value_per_unit = (tick_value / tick_size) * contract_size
+        else:
+            value_per_unit = tick_value * contract_size
         
         # Calculate lot size
-        # risk_usd = lot × sl_distance × value_per_point
-        # lot = risk_usd / (sl_distance × value_per_point)
-        lot = risk_usd / (sl_distance * value_per_point)
+        # risk_usd = lot × sl_distance × value_per_unit
+        # lot = risk_usd / (sl_distance × value_per_unit)
+        lot = risk_usd / (sl_distance * value_per_unit)
         
-        log.info("%s lot calc: risk=$%.2f sl_dist=%.2f tick_size=%.5f tick_val=%.5f contract_size=%.2f point_val=%.5f → lot=%.2f",
-                 symbol, risk_usd, sl_distance, tick_size, tick_value, contract_size, value_per_point, lot)
+        log.info("%s lot calc: risk=$%.2f sl_dist=%.2f tick_size=%.5f tick_val=%.5f contract_size=%.0f value_per_unit=%.2f → lot=%.2f",
+                 symbol, risk_usd, sl_distance, tick_size, tick_value, contract_size, value_per_unit, lot)
     
     # Round to broker's volume step and clamp to min/max
     lot = round(lot / sym_info.volume_step) * sym_info.volume_step
