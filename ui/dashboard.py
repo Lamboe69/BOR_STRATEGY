@@ -672,7 +672,7 @@ def backtest_run():
                 current_close = bar["close"]
                 signal_session = sig["session"]
                 
-                # Check if breakout candle has already covered > 20% of TP distance
+                # Check if breakout candle has already covered > 15% of TP distance
                 total_tp_distance = abs(tp - entry)
                 if direction == "buy":
                     distance_covered = current_close - entry
@@ -708,9 +708,9 @@ def backtest_run():
                     else:
                         sl_adjusted = sl_original + spread_buffer
                 
-                # Decide: immediate entry or wait for retrace
-                if tp_coverage_pct > 20:
-                    # Breakout covered > 20% of TP → wait for retrace to entry level
+                # Decide: immediate entry or wait for retrace (15% threshold)
+                if tp_coverage_pct > 15:
+                    # Breakout covered > 15% of TP → wait for retrace to entry level
                     # BUT cancel if:
                     # 1. Price reaches TP first
                     # 2. Tokyo order: London starts OR Tokyo ends
@@ -787,7 +787,7 @@ def backtest_run():
                     # Simulate trade from retrace entry point
                     outcome, _, _ = _sim_trade(bars, entry_bar_idx, direction, tp, sl_adjusted)
                 else:
-                    # Breakout covered ≤ 20% of TP → enter immediately
+                    # Breakout covered ≤ 15% of TP → enter immediately
                     outcome, _, _ = _sim_trade(bars, i, direction, tp, sl_adjusted)
                 
                 risk_usd = balance * risk_pct / 100.0
@@ -813,7 +813,7 @@ def backtest_run():
                     "pnl":       round(pnl, 2),
                     "balance":   round(bal, 2),
                     "tp_coverage": round(tp_coverage_pct, 1),
-                    "entry_type": "LIMIT" if tp_coverage_pct > 20 else "MARKET",
+                    "entry_type": "LIMIT" if tp_coverage_pct > 15 else "MARKET",
                 })
 
         wins   = sum(1 for t in trades if t["outcome"] == "tp")

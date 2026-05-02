@@ -30,7 +30,7 @@
   padding: 32px 28px 50px;
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 0;
   min-height: 100vh;
   background: transparent;
   position: relative;
@@ -54,8 +54,10 @@
 .kpi-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: 18px;
+  gap: 28px;
   z-index: 2;
+  margin-top: 12px;
+  margin-bottom: 40px;
 }
 
 .kpi {
@@ -63,7 +65,7 @@
   backdrop-filter: blur(16px);
   border: 1px solid var(--border);
   border-radius: var(--r);
-  padding: 24px 22px;
+  padding: 28px 24px;
   position: relative;
   overflow: hidden;
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
@@ -126,9 +128,11 @@
 .sessions {
   display: grid;
   grid-template-columns: 1fr 1fr auto;
-  gap: 18px;
+  gap: 28px;
   align-items: stretch;
   z-index: 2;
+  margin-top: 12px;
+  margin-bottom: 40px;
 }
 
 .ses-card, .next-card {
@@ -136,7 +140,7 @@
   backdrop-filter: blur(16px);
   border: 1px solid var(--border);
   border-radius: var(--r);
-  padding: 26px 24px;
+  padding: 28px 26px;
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 10px 35px rgba(0, 0, 0, 0.45);
 }
@@ -269,6 +273,7 @@
   overflow: hidden;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
   z-index: 2;
+  margin-bottom: 28px;
 }
 
 .panel-head, .log-head {
@@ -722,8 +727,8 @@ tr:hover td {
 
 
   <!-- TABLES -->
-  <div class="tables" style="display: grid; grid-template-columns: 1fr 1fr; gap: 18px; z-index: 2;">
-    <div class="panel">
+  <div class="tables" style="display: grid; grid-template-columns: 1fr 1fr; gap: 28px; z-index: 2; margin-top: 12px; margin-bottom: 40px;">
+    <div class="panel" style="margin-bottom: 0;">
       <div class="panel-head">
         <div class="panel-title">
           <div class="panel-title-bar" style="background:linear-gradient(180deg,var(--purple),var(--blue))"></div>
@@ -746,7 +751,7 @@ tr:hover td {
       </div>
     </div>
 
-    <div class="panel">
+    <div class="panel" style="margin-bottom: 0;">
       <div class="panel-head">
         <div class="panel-title">
           <div class="panel-title-bar" style="background:linear-gradient(180deg,var(--green),var(--cyan))"></div>
@@ -771,7 +776,7 @@ tr:hover td {
   </div>
 
   <!-- LOG -->
-  <div class="log-panel">
+  <div class="log-panel" style="margin-top: 12px; margin-bottom: 0;">
     <div class="log-head">
       <div class="log-title">
         <div class="panel-title-bar" style="background:linear-gradient(180deg,var(--green),var(--cyan))"></div>

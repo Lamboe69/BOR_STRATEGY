@@ -267,7 +267,7 @@ def place_order(symbol: str, direction: str, lot: float,
     # Calculate ORIGINAL SL distance from entry (before any adjustments)
     original_sl_distance = abs(entry - sl)
     
-    # Check if breakout candle has already covered > 20% of TP distance
+    # Check if breakout candle has already covered > 15% of TP distance
     total_tp_distance = abs(tp - entry)
     if direction == "buy":
         distance_covered = current_close - entry
@@ -298,9 +298,9 @@ def place_order(symbol: str, direction: str, lot: float,
         else:
             sl_adjusted = max(sl_adjusted, entry + min_distance)
     
-    # Decide: MARKET order or LIMIT order based on TP coverage
-    if tp_coverage_pct > 20:
-        # Breakout candle covered > 20% of TP → place LIMIT order at breakout level
+    # Decide: MARKET order or LIMIT order based on TP coverage (15% threshold)
+    if tp_coverage_pct > 15:
+        # Breakout candle covered > 15% of TP → place LIMIT order at breakout level
         order_type = mt5.ORDER_TYPE_BUY_LIMIT if direction == "buy" else mt5.ORDER_TYPE_SELL_LIMIT
         limit_price = entry
         
@@ -322,12 +322,12 @@ def place_order(symbol: str, direction: str, lot: float,
             log.error("Limit order failed %s %s: %s", symbol, direction, result.comment)
             return 0
         
-        log.info("LIMIT order placed (TP coverage %.1f%% > 20%%)  %s %s  lot=%.2f  limit=%.5f  SL=%.5f  TP=%.5f  ticket=%d",
+        log.info("LIMIT order placed (TP coverage %.1f%% > 15%%)  %s %s  lot=%.2f  limit=%.5f  SL=%.5f  TP=%.5f  ticket=%d",
                  tp_coverage_pct, symbol, direction.upper(), lot, limit_price, sl_adjusted, tp, result.order)
         return result.order
     
     else:
-        # Breakout candle covered ≤ 20% of TP → place MARKET order immediately
+        # Breakout candle covered ≤ 15% of TP → place MARKET order immediately
         order_type = mt5.ORDER_TYPE_BUY if direction == "buy" else mt5.ORDER_TYPE_SELL
         
         request = {
@@ -352,11 +352,11 @@ def place_order(symbol: str, direction: str, lot: float,
         if buffer_applied:
             adjusted_sl_distance = abs(entry - sl_adjusted)
             rr_ratio = (abs(tp - entry) / adjusted_sl_distance) if adjusted_sl_distance > 0 else 0
-            log.info("MARKET order placed (TP coverage %.1f%% ≤ 20%%)  %s %s  lot=%.2f  entry=%.5f  SL=%.5f (adjusted from %.5f)  TP=%.5f  R/R=1:%.1f  ticket=%d",
+            log.info("MARKET order placed (TP coverage %.1f%% ≤ 15%%)  %s %s  lot=%.2f  entry=%.5f  SL=%.5f (adjusted from %.5f)  TP=%.5f  R/R=1:%.1f  ticket=%d",
                      tp_coverage_pct, symbol, direction.upper(), lot, entry, sl_adjusted, sl, tp, rr_ratio, result.order)
         else:
             rr_ratio = (abs(tp - entry) / original_sl_distance) if original_sl_distance > 0 else 0
-            log.info("MARKET order placed (TP coverage %.1f%% ≤ 20%%)  %s %s  lot=%.2f  entry=%.5f  SL=%.5f  TP=%.5f  R/R=1:%.1f  ticket=%d",
+            log.info("MARKET order placed (TP coverage %.1f%% ≤ 15%%)  %s %s  lot=%.2f  entry=%.5f  SL=%.5f  TP=%.5f  R/R=1:%.1f  ticket=%d",
                      tp_coverage_pct, symbol, direction.upper(), lot, entry, sl, tp, rr_ratio, result.order)
         
         return result.order

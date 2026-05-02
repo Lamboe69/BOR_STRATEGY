@@ -204,7 +204,8 @@ class BORStrategy:
                 body_closed_out = (close < t.sl if t.direction == "buy"
                                    else close > t.sl)
                 self.wicked_out  = not body_closed_out
-                self.prev_entry  = t.entry
+                # Store previous SL (not entry) for wick-out filter
+                self.prev_entry  = t.sl  # Changed: store SL instead of entry
                 self.prev_is_buy = (t.direction == "buy")
                 self._close_trade(ses, t.sl, utc_dt, reason="sl")
             elif not ses_still_active:
@@ -217,10 +218,11 @@ class BORStrategy:
             return signals
 
         # Global wick-out filter (Pine: _wko_buy_ok / _wko_sell_ok)
+        # After wick-out, require close beyond previous SL (not just entry)
         wko_buy_ok  = (not (self.wicked_out and self.prev_is_buy)
-                       or close > self.prev_entry)
+                       or close > self.prev_entry)  # prev_entry stores prev SL for wick-out
         wko_sell_ok = (not (self.wicked_out and not self.prev_is_buy)
-                       or close < self.prev_entry)
+                       or close < self.prev_entry)  # prev_entry stores prev SL for wick-out
 
         for ses, ses_in in ((self.tokyo, tky_in), (self.london, ldn_in)):
             if not ses_in:

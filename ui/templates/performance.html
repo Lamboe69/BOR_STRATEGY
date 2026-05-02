@@ -51,7 +51,7 @@
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 0;
   z-index: 2;
 }
 
@@ -60,6 +60,8 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 18px;
+  margin-top: 12px;
+  margin-bottom: 40px;
 }
 
 .stat-card {
@@ -137,6 +139,8 @@
   overflow: hidden;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-top: 12px;
+  margin-bottom: 40px;
 }
 
 .chart-panel:hover {
@@ -381,7 +385,7 @@
     </div>
 
     <!-- SYMBOL PERFORMANCE CHART -->
-    <div class="chart-panel">
+    <div class="chart-panel" style="margin-bottom: 0;">
       <div class="chart-head">
         <div class="chart-title">
           <div class="chart-title-bar" style="background:linear-gradient(180deg,var(--purple),var(--blue))"></div>

@@ -30,7 +30,7 @@
   padding: 32px 28px 50px;
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 0;
   min-height: 100vh;
   background: transparent;
   position: relative;
@@ -64,6 +64,8 @@
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 2;
+  margin-top: 12px;
+  margin-bottom: 40px;
 }
 
 .run-panel:hover {
@@ -193,6 +195,8 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 18px;
+  margin-top: 12px;
+  margin-bottom: 40px;
 }
 
 .stat-card {
@@ -270,6 +274,8 @@
   padding: 26px 24px;
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 10px 35px rgba(0, 0, 0, 0.45);
+  margin-top: 12px;
+  margin-bottom: 40px;
 }
 
 .wr-compare:hover {
@@ -338,6 +344,8 @@
   overflow: hidden;
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 10px 35px rgba(0, 0, 0, 0.45);
+  margin-top: 12px;
+  margin-bottom: 40px;
 }
 
 .ses-breakdown:hover {
@@ -420,6 +428,8 @@
   overflow: hidden;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
   z-index: 2;
+  margin-top: 12px;
+  margin-bottom: 40px;
 }
 
 .tbl-wrap {
@@ -474,6 +484,8 @@ tr:hover td {
   background: var(--bg3);
   border-radius: var(--r);
   border: 1px solid var(--border);
+  margin-top: 12px;
+  margin-bottom: 40px;
 }
 
 .spinner {
@@ -602,12 +614,12 @@ tr:hover td {
   </div>
 
   <!-- SYMBOL TABS -->
-  <div id="sym-tabs-wrap" style="display:none">
+  <div id="sym-tabs-wrap" style="display:none; margin-top: 12px; margin-bottom: 40px;">
     <div class="sym-tabs" id="sym-tabs"></div>
   </div>
 
   <!-- LOADING -->
-  <div id="bt-loading" style="display:none">
+  <div id="bt-loading" style="display:none; margin-top: 12px; margin-bottom: 40px;">
     <div class="empty-state">
       <div class="spinner"></div>
       <p>Running backtest on historical data...<br><small>This may take a few seconds</small></p>
@@ -621,7 +633,7 @@ tr:hover td {
     <div class="stat-row" id="bt-stats"></div>
 
     <!-- Win Rate + Session Breakdown -->
-    <div class="result-grid" style="margin-top: 20px;">
+    <div class="result-grid" style="margin-top: 12px; margin-bottom: 40px;">
       <!-- Win Rate Comparison -->
       <div class="wr-compare">
         <div class="wr-title">
@@ -644,7 +656,7 @@ tr:hover td {
     </div>
 
     <!-- Trades Table -->
-    <div class="trades-panel" style="margin-top: 24px;">
+    <div class="trades-panel" style="margin-bottom: 0;">
       <div class="panel-head">
         <div class="panel-title">
           <div class="panel-title-bar" style="background:linear-gradient(180deg,var(--green),var(--cyan))"></div>
