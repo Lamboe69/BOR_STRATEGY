@@ -5,8 +5,8 @@ Level snapshotting  : 15-min chart — pre_high/pre_low (last closed 15-min cand
                       before session) and open_high/open_low (first 15-min candle
                       of the session). Sorted high→low: S1 > S2 > S3 > S4.
 
-Signal detection    : 5-min chart — buy when 5-min candle closes above S1,
-                      sell when 5-min candle closes below S4.
+Signal detection    : 15-min chart — buy when 15-min candle closes above S1,
+                      sell when 15-min candle closes below S4.
 
 Entry / SL / TP:
   Buy  — entry=S1, SL=S2, TP=entry+(entry-SL)*10
@@ -17,7 +17,7 @@ Session rules:
   - Max max_trades signals per session
   - Stop all signals once a WIN is recorded in that session
   - Wick-out filter: after a wick-out loss, next signal in the same direction
-    requires the 5-min breakout candle to CLOSE beyond the previous entry
+    requires the breakout candle to CLOSE beyond the previous entry
 """
 
 from dataclasses import dataclass, field

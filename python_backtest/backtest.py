@@ -10,7 +10,7 @@ Usage:
 Or run without arguments to see a quick synthetic demo.
 """
 
-import sys, csv, math, argparse
+import sys, csv, math, argparse, json
 import datetime
 import pytz
 from pathlib import Path
@@ -18,12 +18,42 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from bor_logic import BORStrategy, in_session
-from config.settings import (
-    RISK_PCT, MAX_TRADES_PER_SESSION, TP_MULTIPLIER,
-    TOKYO_START, TOKYO_END, LONDON_START, LONDON_END,
-)
 
 UTC = pytz.utc
+ROOT = Path(__file__).resolve().parent.parent
+SETTINGS_FILE = ROOT / "bor_settings.json"
+
+# Load settings from bor_settings.json
+def _load_settings():
+    try:
+        return json.loads(SETTINGS_FILE.read_text())
+    except Exception:
+        return {}
+
+_cfg = _load_settings()
+RISK_PCT = float(_cfg.get("risk_pct", 1.0))
+MAX_TRADES_PER_SESSION = int(_cfg.get("max_trades_per_session", 2))
+TP_MULTIPLIER = float(_cfg.get("tp_multiplier", 10))
+
+# Parse session times from settings (broker time → UTC)
+def _parse_time(t: str) -> tuple:
+    h, m = t.split(":")
+    return int(h), int(m)
+
+def _broker_to_utc(t: tuple, offset_h: int) -> tuple:
+    total = t[0] * 60 + t[1] - offset_h * 60
+    total %= 1440
+    return total // 60, total % 60
+
+TZ_OFFSET = int(_cfg.get("timezone_offset", 0))
+_ses = _cfg.get("sessions", {})
+_tky = _ses.get("tokyo",  {"start": "00:00", "end": "09:00"})
+_ldn = _ses.get("london", {"start": "07:00", "end": "16:00"})
+
+TOKYO_START  = _broker_to_utc(_parse_time(_tky.get("start", "00:00")), TZ_OFFSET)
+TOKYO_END    = _broker_to_utc(_parse_time(_tky.get("end",   "09:00")), TZ_OFFSET)
+LONDON_START = _broker_to_utc(_parse_time(_ldn.get("start", "07:00")), TZ_OFFSET)
+LONDON_END   = _broker_to_utc(_parse_time(_ldn.get("end",   "16:00")), TZ_OFFSET)
 
 
 # ── CSV loader ────────────────────────────────────────────────────────────────

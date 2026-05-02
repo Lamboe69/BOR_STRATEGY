@@ -1,19 +1,5 @@
 {
-  "open_trades": {
-    "2698051993": {
-      "ticket": 2698051993,
-      "symbol": "XAUUSDm",
-      "direction": "buy",
-      "session": "london",
-      "entry": 4572.147,
-      "sl": 4568.979,
-      "tp": 4603.827,
-      "lot": 0.05,
-      "time": "2026-05-01 11:30",
-      "pnl": 0.0,
-      "last_updated": "2026-05-01T11:45:02.511784"
-    }
-  },
+  "open_trades": {},
   "closed_trades": [
     {
       "ticket": 2684769676,
@@ -774,6 +760,57 @@
       "close_price": 4607.377,
       "actual_pnl": 0.0,
       "closed_at": "2026-05-01T08:33:47.160261"
+    },
+    {
+      "ticket": 2698051993,
+      "symbol": "XAUUSDm",
+      "direction": "buy",
+      "session": "london",
+      "entry": 4572.147,
+      "sl": 4568.979,
+      "tp": 4603.827,
+      "lot": 0.05,
+      "time": "2026-05-01 11:30",
+      "pnl": 0.0,
+      "last_updated": "2026-05-01T11:45:02.511784",
+      "close_reason": "tp",
+      "close_price": 4603.827,
+      "actual_pnl": 138.85,
+      "closed_at": "2026-05-01T12:25:44.610423"
+    },
+    {
+      "ticket": 2698193544,
+      "symbol": "US30m",
+      "direction": "buy",
+      "session": "london",
+      "entry": 49870.5,
+      "sl": 49858.9,
+      "tp": 49986.5,
+      "lot": 1.29,
+      "time": "2026-05-01 12:59",
+      "pnl": 0.0,
+      "last_updated": "2026-05-01T12:59:59.952278",
+      "close_reason": "sl",
+      "close_price": 49858.9,
+      "actual_pnl": -14.96,
+      "closed_at": "2026-05-01T13:30:06.439667"
+    },
+    {
+      "ticket": 2698678311,
+      "symbol": "US30m",
+      "direction": "sell",
+      "session": "london",
+      "entry": 49839.9,
+      "sl": 49849.2,
+      "tp": 49746.9,
+      "lot": 1.61,
+      "time": "2026-05-01 13:30",
+      "pnl": 0.0,
+      "last_updated": "2026-05-01T13:45:03.029412",
+      "close_reason": "sl",
+      "close_price": 49849.2,
+      "actual_pnl": -29.95,
+      "closed_at": "2026-05-01T13:54:35.665530"
     }
   ],
   "version": "1.0",
@@ -785,9 +822,9 @@
         "trade_count": 0
       },
       "london": {
-        "wins": 0,
+        "wins": 1,
         "losses": 7,
-        "trade_count": 1
+        "trade_count": 0
       }
     },
     "US30m": {
@@ -798,8 +835,8 @@
       },
       "london": {
         "wins": 1,
-        "losses": 2,
-        "trade_count": 0
+        "losses": 4,
+        "trade_count": 2
       }
     },
     "USTECm": {
