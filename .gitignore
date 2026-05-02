@@ -6,6 +6,7 @@ __pycache__/
 .Python
 env/
 venv/
+.venv/
 ENV/
 build/
 develop-eggs/
@@ -37,7 +38,23 @@ Thumbs.db
 # Logs
 *.log
 logs/
+dashboard.log
+bor_live.log
 
 # MT5
 *.ex5
 *.mq5
+
+# SENSITIVE - Credentials and Configuration
+.env
+bor_settings.json
+users.json
+
+# Runtime Data - Should not be in version control
+bor_state.json
+bor_trades.db.json
+bor_backtest.json
+performance_history.json
+
+# Archives
+*.zip

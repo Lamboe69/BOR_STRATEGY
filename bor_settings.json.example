@@ -1,0 +1,30 @@
+{
+  "mt5_login": "your_account_number",
+  "mt5_password": "your_password",
+  "mt5_server": "your_broker_server",
+  "mt5_path": "",
+  "symbols": [
+    "EURUSD",
+    "XAUUSD",
+    "US30",
+    "USTEC"
+  ],
+  "initial_balance": 10000,
+  "risk_pct": 1.0,
+  "max_trades_per_session": 2,
+  "tp_multiplier": 10,
+  "poll_interval": 1,
+  "timezone_offset": 0,
+  "sessions": {
+    "tokyo": {
+      "enabled": true,
+      "start": "00:00",
+      "end": "09:00"
+    },
+    "london": {
+      "enabled": true,
+      "start": "07:00",
+      "end": "16:00"
+    }
+  }
+}

@@ -35,13 +35,17 @@ At each **Tokyo** (00:00–09:00 UTC) and **London** (07:00–16:00 UTC) session
 ```
 BOR_Bot/
 ├── bor_logic.py              ← core strategy engine (shared)
+├── bor_settings.json         ← configuration file (create from .example)
+├── trades_db.py              ← persistent trade database
+├── performance_tracker.py    ← performance history tracking
 ├── requirements.txt
-├── config/
-│   └── settings.py           ← all configuration lives here
 ├── python_mt5/
 │   └── live_bot.py           ← live trading via MetaTrader 5 API
-└── python_backtest/
-    └── backtest.py           ← CSV backtester / demo mode
+├── python_backtest/
+│   └── backtest.py           ← CSV backtester / demo mode
+└── ui/
+    ├── dashboard.py          ← Flask web dashboard
+    └── templates/            ← HTML templates
 ```
 
 ---
@@ -59,31 +63,75 @@ pip install -r requirements.txt
 
 ### 2 — Configure
 
-Edit `config/settings.py`:
+**First time setup:**
 
-```python
-MT5_LOGIN    = 123456        # your account number
-MT5_PASSWORD = "your_pass"
-MT5_SERVER   = "BrokerName-Live"
-
-SYMBOLS  = ["EURUSD", "XAUUSD", "US30.cash", "NAS100.cash"]
-RISK_PCT = 1.0               # 1 % of balance per trade
+```bash
+# Copy example files
+cp .env.example .env
+cp bor_settings.json.example bor_settings.json
 ```
 
-> Symbol names must match exactly what your broker uses in MT5.
+Then edit `bor_settings.json`:
+
+```json
+{
+  "mt5_login": "your_account_number",
+  "mt5_password": "your_password",
+  "mt5_server": "BrokerName-Server",
+  "symbols": ["EURUSD", "XAUUSD", "US30", "USTEC"],
+  "initial_balance": 10000,
+  "risk_pct": 1.0,
+  "max_trades_per_session": 2,
+  "tp_multiplier": 10,
+  "poll_interval": 1,
+  "timezone_offset": 0,
+  "sessions": {
+    "tokyo": {
+      "enabled": true,
+      "start": "00:00",
+      "end": "09:00"
+    },
+    "london": {
+      "enabled": true,
+      "start": "07:00",
+      "end": "16:00"
+    }
+  }
+}
+```
+
+> **Important:** Symbol names must match exactly what your broker uses in MT5.
 > Common alternatives: `GOLD`, `XAUUSD`, `US30`, `DJ30`, `NAS100`, `USTEC`.
 
-### 3a — Run the live bot
+> **Security:** Never commit `bor_settings.json` or `.env` to version control!
+> These files contain your credentials and are in `.gitignore`.
+
+### 3a — Run the Web Dashboard (Recommended)
+
+```bash
+cd BOR_Bot
+python ui/dashboard.py
+```
+
+The dashboard will open in your browser at `http://localhost:5000`.
+
+From the dashboard you can:
+- Start/stop the live bot
+- View real-time trades and performance
+- Run backtests with MT5 data
+- Manage settings
+
+### 3b — Run the live bot directly
 
 ```bash
 cd BOR_Bot
 python python_mt5/live_bot.py
 ```
 
-The bot polls every 10 seconds, detects new closed 15-min bars, and places
-market orders with SL/TP automatically.
+The bot polls every 1 second, detects new closed 15-min bars, and places
+orders with SL/TP automatically.
 
-### 3b — Run the backtester
+### 3c — Run the backtester
 
 **With your own CSV data:**
 
