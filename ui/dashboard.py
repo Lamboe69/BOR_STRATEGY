@@ -452,7 +452,7 @@ def backtest_run():
     UTC = pytz.utc
 
     data      = request.get_json(force=True)
-    symbol    = data.get("symbol", "EURUSD").strip().upper()
+    symbol    = data.get("symbol", "EURUSD").strip()  # Keep original case - broker symbols are case-sensitive
     csv_m15   = data.get("csv_m15", "").strip()
     balance   = float(data.get("balance", 10000))
     risk_pct  = float(data.get("risk_pct", 1.0))
@@ -489,6 +489,11 @@ def backtest_run():
             dt_from = datetime.datetime.strptime(date_from, "%Y-%m-%d").replace(tzinfo=UTC)
         if date_to:
             dt_to   = datetime.datetime.strptime(date_to,   "%Y-%m-%d").replace(tzinfo=UTC) + datetime.timedelta(days=1)
+        # Validate: from date must be before to date
+        if dt_from and dt_to and dt_from >= dt_to:
+            return jsonify({"ok": False, "msg": "Start date must be before end date"}), 400
+    except ValueError as e:
+        return jsonify({"ok": False, "msg": f"Invalid date format: {str(e)}"}), 400
     except Exception:
         pass
 
@@ -515,12 +520,39 @@ def backtest_run():
             kwargs   = {"login": login, "password": password, "server": server}
             if path:
                 kwargs["path"] = path
+            
             if not mt5.initialize(**kwargs):
-                return None
+                error = mt5.last_error()
+                return None, f"MT5 initialization failed: {error}"
+            
+            # Check if symbol exists
+            symbol_info = mt5.symbol_info(sym)
+            if symbol_info is None:
+                # Get list of similar symbols to help user
+                all_symbols = mt5.symbols_get()
+                similar = []
+                if all_symbols:
+                    sym_base = sym.replace('M', '').replace('m', '')
+                    similar = [s.name for s in all_symbols if sym_base.lower() in s.name.lower()][:5]
+                mt5.shutdown()
+                
+                if similar:
+                    return None, f"Symbol '{sym}' not found. Did you mean: {', '.join(similar)}? Check the exact symbol name in your MT5 Market Watch."
+                else:
+                    return None, f"Symbol '{sym}' not found. Please check the exact symbol name in your MT5 Market Watch (case-sensitive)."
+            
+            # Enable symbol if not visible
+            if not symbol_info.visible:
+                if not mt5.symbol_select(sym, True):
+                    mt5.shutdown()
+                    return None, f"Failed to enable symbol '{sym}'"
+            
             rates = mt5.copy_rates_range(sym, timeframe_mt5, from_dt, to_dt)
             mt5.shutdown()
+            
             if rates is None or len(rates) == 0:
-                return None
+                return None, f"No historical data returned for '{sym}' in the date range {from_dt.strftime('%Y-%m-%d')} to {to_dt.strftime('%Y-%m-%d')}. The broker may not have data available for these dates yet."
+            
             bars = []
             for r in rates:
                 bars.append({
@@ -530,106 +562,58 @@ def backtest_run():
                     "low":   float(r["low"]),
                     "close": float(r["close"]),
                 })
-            return bars
-        except Exception:
-            return None
+            return bars, None
+        except Exception as e:
+            return None, f"MT5 error: {str(e)}"
 
     def _filter(bars):
         if dt_from: bars = [b for b in bars if b["time"] >= dt_from]
         if dt_to:   bars = [b for b in bars if b["time"] <  dt_to]
         return bars
 
-    # Load data: MT5 first (no CSV), then CSV, then synthetic
+    # Load data: MT5 first, then CSV - NO SYNTHETIC FALLBACK
     bars_m15 = None
     data_source = None
+    error_msg = None
     _from = dt_from or (datetime.datetime.now(UTC) - datetime.timedelta(days=120))
     _to   = dt_to   or  datetime.datetime.now(UTC)
     
+    # Try MT5 first
     if not csv_m15:
         try:
             import MetaTrader5 as mt5
-            bars_m15 = _load_mt5(symbol, _from, _to, mt5.TIMEFRAME_M15)
+            bars_m15, error_msg = _load_mt5(symbol, _from, _to, mt5.TIMEFRAME_M15)
             if bars_m15 and len(bars_m15) > 0:
                 actual_from = bars_m15[0]["time"].strftime("%Y-%m-%d")
                 actual_to = bars_m15[-1]["time"].strftime("%Y-%m-%d")
                 data_source = f"MT5 real data ({actual_from} to {actual_to})"
-        except Exception:
-            pass
+                error_msg = None
+        except Exception as e:
+            error_msg = f"Failed to load MT5: {str(e)}"
+    
+    # Try CSV if MT5 failed
     if bars_m15 is None and csv_m15:
-        bars_m15 = _filter(_load_csv(csv_m15))
-        if bars_m15:
-            data_source = "CSV data"
-
-    def _make_synthetic(interval_min, start_dt, end_dt):
-        """Generate realistic synthetic bars with trends, volatility and session activity."""
-        seed = sum(ord(c) for c in symbol) + interval_min
-        random.seed(seed)
-
-        # symbol-specific base price and volatility
-        sym_upper = symbol.upper()
-        if any(x in sym_upper for x in ['XAU','GOLD']):
-            base_price, vol_scale = 1950.0, 2.5
-        elif any(x in sym_upper for x in ['US30','DJ','DOW']):
-            base_price, vol_scale = 38000.0, 80.0
-        elif any(x in sym_upper for x in ['NAS','USTEC','US100']):
-            base_price, vol_scale = 17000.0, 50.0
-        elif any(x in sym_upper for x in ['GBP']):
-            base_price, vol_scale = 1.2700, 0.0008
-        elif any(x in sym_upper for x in ['JPY']):
-            base_price, vol_scale = 149.0, 0.12
-        else:  # EURUSD default
-            base_price, vol_scale = 1.0850, 0.0006
-
-        result = []
-        price  = base_price
-        trend  = 0.0
-        vol    = vol_scale
-        start  = start_dt.replace(hour=0, minute=0, second=0, microsecond=0)
-        end    = end_dt.replace(hour=23, minute=59, second=0, microsecond=0)
-        days   = (end - start).days + 1
-        bars_per_day = (24 * 60) // interval_min
-
-        for i in range(days * bars_per_day):
-            dt = start + datetime.timedelta(minutes=interval_min * i)
-            h  = dt.hour
-
-            # session volatility multiplier — active during Tokyo/London/NY
-            if 0 <= h < 9:    ses_mult = 1.4   # Tokyo
-            elif 7 <= h < 16: ses_mult = 1.8   # London
-            elif 13 <= h < 22: ses_mult = 1.6  # NY
-            else:              ses_mult = 0.5   # dead hours
-
-            # slowly evolving trend + mean reversion
-            trend = trend * 0.995 + random.gauss(0, vol_scale * 0.08)
-            # volatility clustering
-            vol = vol * 0.94 + vol_scale * 0.06 + abs(random.gauss(0, vol_scale * 0.02))
-
-            move  = random.gauss(trend, vol * ses_mult)
-            o     = price
-            c     = o + move
-            wick  = abs(random.gauss(0, vol * ses_mult * 0.6))
-            h_bar = max(o, c) + wick
-            l_bar = min(o, c) - wick
-
-            # keep price from drifting too far from base (soft mean reversion)
-            price = c + (base_price - c) * 0.0005
-
-            result.append({"time": dt, "open": round(o,5), "high": round(h_bar,5),
-                           "low": round(l_bar,5), "close": round(price,5)})
-        return result
+        try:
+            bars_m15 = _filter(_load_csv(csv_m15))
+            if bars_m15:
+                data_source = "CSV data"
+                error_msg = None
+        except Exception as e:
+            error_msg = f"Failed to load CSV: {str(e)}"
+    
+    # Reject if no real data available
+    if bars_m15 is None or len(bars_m15) == 0:
+        return jsonify({
+            "ok": False, 
+            "msg": error_msg or f"No historical data available for {symbol} in the selected date range. Please check: 1) MT5 connection, 2) Symbol name matches your broker, 3) Date range has data available."
+        }), 400
 
     try:
         sys.path.insert(0, str(ROOT))
         from bor_logic import BORStrategy
 
-        # ── M15 bars only — strategy uses M15 for both levels and signals ──
-        if bars_m15 is not None:
-            bars = bars_m15
-            if not data_source:
-                data_source = "MT5 real data"
-        else:
-            bars = _make_synthetic(15, _from, _to)
-            data_source = f"Synthetic demo ({_from.strftime('%Y-%m-%d')} to {_to.strftime('%Y-%m-%d')})"
+        # Use real data from MT5 or CSV
+        bars = bars_m15
 
         if len(bars) < 2:
             return jsonify({"ok": False, "msg": "Not enough bars in the selected date range."}), 400

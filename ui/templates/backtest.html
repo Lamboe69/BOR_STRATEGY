@@ -149,6 +149,11 @@
 }
 
 /* ── SYMBOL TABS ── */
+.sym-tabs-wrap {
+  margin-top: 12px;
+  margin-bottom: 28px;
+}
+
 .sym-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -183,7 +188,9 @@
 .result-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 20px;
+  gap: 28px;
+  margin-top: 12px;
+  margin-bottom: 0;
 }
 
 @media (max-width: 900px) {
@@ -194,9 +201,9 @@
 .stat-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: 18px;
+  gap: 28px;
   margin-top: 12px;
-  margin-bottom: 40px;
+  margin-bottom: 28px;
 }
 
 .stat-card {
@@ -274,8 +281,6 @@
   padding: 26px 24px;
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 10px 35px rgba(0, 0, 0, 0.45);
-  margin-top: 12px;
-  margin-bottom: 40px;
 }
 
 .wr-compare:hover {
@@ -344,8 +349,6 @@
   overflow: hidden;
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 10px 35px rgba(0, 0, 0, 0.45);
-  margin-top: 12px;
-  margin-bottom: 40px;
 }
 
 .ses-breakdown:hover {
@@ -581,9 +584,10 @@ tr:hover td {
 
   <!-- RUN PANEL -->
   <div class="run-panel">
-    <div class="run-field">
-      <label>Symbol</label>
-      <select id="bt-symbol"></select>
+    <div class="run-field grow">
+      <label>Symbol <span style="font-size:9px; color:var(--fg3); font-weight:400;">(Type exact name from MT5 - case sensitive)</span></label>
+      <input type="text" id="bt-symbol" placeholder="e.g. XAUUSDm, US30m, EURUSDm" list="symbol-suggestions">
+      <datalist id="symbol-suggestions"></datalist>
     </div>
     <div class="run-field">
       <label>From Date</label>
@@ -614,12 +618,12 @@ tr:hover td {
   </div>
 
   <!-- SYMBOL TABS -->
-  <div id="sym-tabs-wrap" style="display:none; margin-top: 12px; margin-bottom: 40px;">
+  <div id="sym-tabs-wrap" class="sym-tabs-wrap" style="display:none;">
     <div class="sym-tabs" id="sym-tabs"></div>
   </div>
 
   <!-- LOADING -->
-  <div id="bt-loading" style="display:none; margin-top: 12px; margin-bottom: 40px;">
+  <div id="bt-loading" style="display:none; margin-top: 12px; margin-bottom: 28px;">
     <div class="empty-state">
       <div class="spinner"></div>
       <p>Running backtest on historical data...<br><small>This may take a few seconds</small></p>
@@ -633,7 +637,7 @@ tr:hover td {
     <div class="stat-row" id="bt-stats"></div>
 
     <!-- Win Rate + Session Breakdown -->
-    <div class="result-grid" style="margin-top: 12px; margin-bottom: 0;">
+    <div class="result-grid">
       <!-- Win Rate Comparison -->
       <div class="wr-compare">
         <div class="wr-title">
@@ -676,12 +680,22 @@ tr:hover td {
 let _allResults = {};
 let _activeSymbol = null;
 
-// Load available symbols
+// Load available symbols and set first one as placeholder
 async function loadSymbols() {
   try {
     const r = await fetch('/backtest/symbols').then(res => res.json());
-    const sel = document.getElementById('bt-symbol');
-    sel.innerHTML = r.symbols.map(s => `<option value="${s}">${s}</option>`).join('');
+    const input = document.getElementById('bt-symbol');
+    const datalist = document.getElementById('symbol-suggestions');
+    
+    if (r.symbols && r.symbols.length > 0) {
+      // Set first symbol as default value
+      input.value = r.symbols[0];
+      // Update placeholder with available symbols
+      input.placeholder = `e.g. ${r.symbols.slice(0, 3).join(', ')}`;
+      
+      // Populate datalist for autocomplete suggestions
+      datalist.innerHTML = r.symbols.map(s => `<option value="${s}">`).join('');
+    }
   } catch(e) {}
 }
 loadSymbols();
@@ -709,7 +723,12 @@ loadSavedResults();
 })();
 
 async function runBacktest() {
-  const symbol = document.getElementById('bt-symbol').value;
+  const symbol = document.getElementById('bt-symbol').value.trim();
+  
+  if (!symbol) {
+    alert('Please enter a symbol name (e.g. XAUUSDm, US30m, EURUSDm)');
+    return;
+  }
   const balance = parseFloat(document.getElementById('bt-balance').value) || 10000;
   const risk_pct = parseFloat(document.getElementById('bt-risk').value) || 1.0;
   const max_trades = parseInt(document.getElementById('bt-max-trades').value) || 2;
