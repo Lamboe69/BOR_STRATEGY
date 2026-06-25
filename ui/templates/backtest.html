@@ -200,7 +200,7 @@
 /* ── STAT CARDS ── */
 .stat-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 28px;
   margin-top: 12px;
   margin-bottom: 28px;
@@ -211,7 +211,7 @@
   backdrop-filter: blur(16px);
   border: 1px solid var(--border);
   border-radius: var(--r);
-  padding: 24px 22px;
+  padding: 26px 28px;
   position: relative;
   overflow: hidden;
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
@@ -258,6 +258,8 @@
   font-family: 'Space Grotesk', system-ui, sans-serif;
   letter-spacing: -0.6px;
   line-height: 1;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .stat-val.green  { color: var(--green); text-shadow: 0 0 20px rgba(52, 211, 153, 0.6); }
@@ -422,6 +424,54 @@
 
 .ses-num span { font-weight: 700; }
 
+/* ── CHART PANEL ── */
+.chart-panel {
+  background: var(--bg3);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-top: 12px;
+  margin-bottom: 40px;
+}
+.chart-panel:hover {
+  transform: translateY(-8px);
+  border-color: var(--purple);
+  box-shadow: 0 25px 60px rgba(168, 85, 247, 0.25);
+}
+.chart-head {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,0.035);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.chart-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--fg2);
+  text-transform: uppercase;
+  letter-spacing: 1.1px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.chart-title-bar {
+  width: 4px;
+  height: 18px;
+  border-radius: 4px;
+}
+.chart-body {
+  padding: 24px 20px;
+}
+.chart-container {
+  position: relative;
+  width: 100%;
+}
+
 /* ── TRADES TABLE ── */
 .trades-panel {
   background: var(--bg3);
@@ -474,6 +524,14 @@ tr:hover td {
   color: var(--fg);
 }
 
+/* ── TRADE ROW COLORS ── */
+.t-pos { color: var(--green); }
+.t-neg { color: var(--red); }
+.t-buy { color: var(--cyan); }
+.t-sell { color: var(--amber); }
+.t-win { color: var(--green); font-weight: 600; }
+.t-loss { color: var(--red); font-weight: 600; }
+
 /* Empty & Loading States */
 .empty-state {
   display: flex;
@@ -505,10 +563,6 @@ tr:hover td {
 }
 
 /* ── RESPONSIVE ── */
-@media (max-width: 1150px) {
-  .stat-row { grid-template-columns: repeat(3, 1fr); }
-}
-
 @media (max-width: 900px) {
   .run-panel { flex-direction: column; align-items: stretch; }
   .run-field { min-width: unset; }
@@ -532,6 +586,9 @@ tr:hover td {
   .stat-val { font-size: 22px; }
   .stat-sub { font-size: 10.5px; }
   
+  .chart-panel { margin-bottom: 28px; }
+  .chart-body { padding: 18px 16px; }
+  .chart-container { height: 240px !important; }
   .wr-compare, .ses-breakdown { padding: 20px 18px; }
   .wr-title, .panel-title { font-size: 10px; }
   .wr-item-label { font-size: 11.5px; }
@@ -575,6 +632,15 @@ tr:hover td {
   td { padding: 10px 8px; font-size: 10.5px; }
   
   .empty-state { padding: 60px 30px; }
+  .chart-panel { margin-bottom: 20px; }
+  .chart-body { padding: 16px 12px; }
+  .chart-container { height: 220px !important; }
+  
+  /* Dampen hover on mobile */
+  .stat-card:hover { transform: translateY(-5px) scale(1.02); }
+  .chart-panel:hover { transform: translateY(-4px); }
+  .wr-compare:hover { transform: translateY(-4px); }
+  .ses-breakdown:hover { transform: translateY(-4px); }
 }
 </style>
 {% endblock %}
@@ -636,6 +702,22 @@ tr:hover td {
     <!-- Statistics Cards -->
     <div class="stat-row" id="bt-stats"></div>
 
+    <!-- Equity Curve Chart -->
+    <div class="chart-panel">
+      <div class="chart-head">
+        <div class="chart-title">
+          <div class="chart-title-bar" style="background:linear-gradient(180deg,var(--green),var(--cyan))"></div>
+          Equity Curve
+        </div>
+        <span class="c-config" id="bt-config" style="font-size:10px;color:var(--fg3);font-family:'JetBrains Mono',monospace;"></span>
+      </div>
+      <div class="chart-body">
+        <div class="chart-container" style="height:300px;">
+          <canvas id="btChart"></canvas>
+        </div>
+      </div>
+    </div>
+
     <!-- Win Rate + Session Breakdown -->
     <div class="result-grid">
       <!-- Win Rate Comparison -->
@@ -659,6 +741,27 @@ tr:hover td {
       </div>
     </div>
 
+    <!-- Trade Details Table -->
+    <div class="trades-panel">
+      <div class="panel-head">
+        <div class="panel-title">
+          <div class="panel-title-bar" style="background:linear-gradient(180deg,var(--purple),var(--blue))"></div>
+          Trade Details
+        </div>
+        <span class="cnt" id="bt-trade-count" style="font-size:10px;font-weight:700;padding:4px 12px;border-radius:999px;background:rgba(255,255,255,0.08);color:var(--fg2);">0</span>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th><th>Time</th><th>Session</th><th>Dir</th><th>Entry</th><th>SL</th><th>TP</th><th>Outcome</th><th>P&amp;L</th><th>Balance</th>
+            </tr>
+          </thead>
+          <tbody id="bt-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
   </div>
 
   <!-- EMPTY STATE -->
@@ -676,25 +779,57 @@ tr:hover td {
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
 let _allResults = {};
 let _activeSymbol = null;
+let btChart = null;
+
+const $ = id => document.getElementById(id);
+const fmt = (v, d=5) => typeof v==='number' ? v.toFixed(d) : (v ?? '—');
+const fmtMoney = v => (v>=0?'+$':'-$') + Math.abs(v).toFixed(2);
+
+function initBtChart() {
+  const ctx = $('btChart');
+  btChart = new Chart(ctx, {
+    type: 'line',
+    data: { labels: [], datasets: [
+      { label: 'Balance', data: [], borderColor: '#34d399', borderWidth: 3, tension: 0.4, fill: true, backgroundColor: 'rgba(52,211,153,0.08)', pointRadius: 2, pointHoverRadius: 6 }
+    ]},
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { intersect: false, mode: 'index' },
+      plugins: {
+        legend: { display: true, position: 'top', labels: { color: '#a5b4fc', font: { size: 12, weight: '700' }, usePointStyle: true } },
+        tooltip: {
+          backgroundColor: 'rgba(20,20,35,0.98)', titleColor: '#e0e7ff', bodyColor: '#a5b4fc',
+          borderColor: 'rgba(168,85,247,0.6)', borderWidth: 2, padding: 14,
+          callbacks: {
+            label: function(ctx) { return 'Balance: $' + ctx.parsed.y.toLocaleString('en-US', {minimumFractionDigits:2}); }
+          }
+        }
+      },
+      scales: {
+        x: { grid: { color: 'rgba(120,100,255,0.1)', drawBorder: false }, ticks: { color: '#818cf8', font: { size: 10, weight: '600' }, maxRotation: 45, autoSkip: true, maxTicksLimit: 15 } },
+        y: { grid: { color: 'rgba(120,100,255,0.1)', drawBorder: false }, ticks: { color: '#818cf8', font: { size: 10, weight: '600' }, callback: function(v) { return '$' + v.toLocaleString(); } } }
+      }
+    }
+  });
+}
 
 // Load available symbols and set first one as placeholder
 async function loadSymbols() {
   try {
-    const r = await fetch('/backtest/symbols').then(res => res.json());
-    const input = document.getElementById('bt-symbol');
-    const datalist = document.getElementById('symbol-suggestions');
+    const r = await fetch('/backtest/symbols');
+    if (r.status === 401) { window.location.href = '/login'; return; }
+    const rj = await r.json();
+    const input = $('bt-symbol');
+    const datalist = $('symbol-suggestions');
     
-    if (r.symbols && r.symbols.length > 0) {
-      // Set first symbol as default value
-      input.value = r.symbols[0];
-      // Update placeholder with available symbols
-      input.placeholder = `e.g. ${r.symbols.slice(0, 3).join(', ')}`;
-      
-      // Populate datalist for autocomplete suggestions
-      datalist.innerHTML = r.symbols.map(s => `<option value="${s}">`).join('');
+    if (rj.symbols && rj.symbols.length > 0) {
+      input.value = rj.symbols[0];
+      input.placeholder = `e.g. ${rj.symbols.slice(0, 3).join(', ')}`;
+      datalist.innerHTML = rj.symbols.map(s => `<option value="${s}">`).join('');
     }
   } catch(e) {}
 }
@@ -703,8 +838,10 @@ loadSymbols();
 // Load previously saved results
 async function loadSavedResults() {
   try {
-    const r = await fetch('/backtest/results').then(res => res.json());
-    Object.assign(_allResults, r);
+    const r = await fetch('/backtest/results');
+    if (r.status === 401) { window.location.href = '/login'; return; }
+    const rj = await r.json();
+    Object.assign(_allResults, rj);
     if (Object.keys(_allResults).length > 0) {
       renderTabs();
       showResult(Object.keys(_allResults)[0]);
@@ -718,28 +855,27 @@ loadSavedResults();
   const now = new Date();
   const from = new Date(now);
   from.setMonth(from.getMonth() - 4);
-  document.getElementById('bt-from').value = from.toISOString().slice(0,10);
-  document.getElementById('bt-to').value = now.toISOString().slice(0,10);
+  $('bt-from').value = from.toISOString().slice(0,10);
+  $('bt-to').value = now.toISOString().slice(0,10);
 })();
 
 async function runBacktest() {
-  const symbol = document.getElementById('bt-symbol').value.trim();
+  const symbol = $('bt-symbol').value.trim();
   
   if (!symbol) {
     alert('Please enter a symbol name (e.g. XAUUSDm, US30m, EURUSDm)');
     return;
   }
-  const balance = parseFloat(document.getElementById('bt-balance').value) || 10000;
-  const risk_pct = parseFloat(document.getElementById('bt-risk').value) || 1.0;
-  const max_trades = parseInt(document.getElementById('bt-max-trades').value) || 2;
-  const date_from = document.getElementById('bt-from').value;
-  const date_to = document.getElementById('bt-to').value;
+  const balance = parseFloat($('bt-balance').value) || 10000;
+  const risk_pct = parseFloat($('bt-risk').value) || 1.0;
+  const max_trades = parseInt($('bt-max-trades').value) || 2;
+  const date_from = $('bt-from').value;
+  const date_to = $('bt-to').value;
 
-  // UI Feedback
-  document.getElementById('bt-run-btn').disabled = true;
-  document.getElementById('bt-empty').style.display = 'none';
-  document.getElementById('bt-results').style.display = 'none';
-  document.getElementById('bt-loading').style.display = 'block';
+  $('bt-run-btn').disabled = true;
+  $('bt-empty').style.display = 'none';
+  $('bt-results').style.display = 'none';
+  $('bt-loading').style.display = 'block';
 
   try {
     const res = await fetch('/backtest/run', {
@@ -747,54 +883,46 @@ async function runBacktest() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ symbol, balance, risk_pct, max_trades, date_from, date_to })
     });
-
+    if (res.status === 401) { window.location.href = '/login'; return; }
     const j = await res.json();
     if (!j.ok) throw new Error(j.msg || 'Backtest failed');
-
     _allResults[symbol] = j.result;
     renderTabs();
     showResult(symbol);
   } catch (err) {
     alert('Backtest Error: ' + err.message);
-    document.getElementById('bt-empty').style.display = 'block';
+    $('bt-empty').style.display = 'block';
   } finally {
-    document.getElementById('bt-loading').style.display = 'none';
-    document.getElementById('bt-run-btn').disabled = false;
+    $('bt-loading').style.display = 'none';
+    $('bt-run-btn').disabled = false;
   }
 }
 
 function renderTabs() {
-  const wrap = document.getElementById('sym-tabs-wrap');
-  const container = document.getElementById('sym-tabs');
+  const wrap = $('sym-tabs-wrap');
+  const container = $('sym-tabs');
   const symbols = Object.keys(_allResults);
-
-  if (!symbols.length) {
-    wrap.style.display = 'none';
-    return;
-  }
-
+  if (!symbols.length) { wrap.style.display = 'none'; return; }
   wrap.style.display = 'block';
-  container.innerHTML = symbols.map(s => `
-    <div class="sym-tab ${s === _activeSymbol ? 'active' : ''}" onclick="showResult('${s}')">
-      ${s}
-    </div>
-  `).join('');
+  container.innerHTML = symbols.map(s =>
+    `<div class="sym-tab ${s === _activeSymbol ? 'active' : ''}" onclick="showResult('${s}')">${s}</div>`
+  ).join('');
 }
 
 function showResult(symbol) {
   _activeSymbol = symbol;
   renderTabs();
-
   const result = _allResults[symbol];
   if (!result) return;
 
-  document.getElementById('bt-empty').style.display = 'none';
-  document.getElementById('bt-results').style.display = 'block';
+  $('bt-empty').style.display = 'none';
+  $('bt-results').style.display = 'block';
 
   const netPositive = result.net_pnl >= 0;
+  const cfg = result.config || {};
 
   // Stat Cards
-  document.getElementById('bt-stats').innerHTML = `
+  $('bt-stats').innerHTML = `
     <div class="stat-card purple">
       <div class="stat-label">Total Trades</div>
       <div class="stat-val purple">${result.total}</div>
@@ -802,38 +930,69 @@ function showResult(symbol) {
     </div>
     <div class="stat-card ${result.win_rate >= 50 ? 'green' : 'red'}">
       <div class="stat-label">Win Rate</div>
-      <div class="stat-val ${result.win_rate >= 50 ? 'green' : 'red'}">${result.win_rate.toFixed(1)}%</div>
-      <div class="stat-sub">${result.timeframe || '—'}</div>
+      <div class="stat-val ${result.win_rate >= 50 ? 'green' : 'red'}">${(result.win_rate || 0).toFixed(1)}%</div>
+      <div class="stat-sub">${result.timeframe || '—'} (RR ${cfg.tp_multiplier || '—'}:1)</div>
     </div>
     <div class="stat-card ${netPositive ? 'green' : 'red'}">
-      <div class="stat-label">Net P&L</div>
+      <div class="stat-label">Net P&amp;L</div>
       <div class="stat-val ${netPositive ? 'green' : 'red'}">
-        ${netPositive ? '+' : ''}$${result.net_pnl.toLocaleString('en-US', {minimumFractionDigits:2})}
+        ${netPositive ? '+' : ''}$${(result.net_pnl || 0).toLocaleString('en-US', {minimumFractionDigits:2})}
       </div>
       <div class="stat-sub">${netPositive ? '+' : ''}${result.net_pct || 0}% return</div>
     </div>
-    <div class="stat-card amber">
-      <div class="stat-label">Date Range</div>
-      <div class="stat-val amber" style="font-size:13px;">${result.date_range || '—'}</div>
-      <div class="stat-sub">Final Balance: $${result.final?.toLocaleString()}</div>
+    <div class="stat-card ${result.final >= result.initial ? 'green' : 'red'}">
+      <div class="stat-label">Final Balance</div>
+      <div class="stat-val ${result.final >= result.initial ? 'green' : 'red'}" style="font-size:24px;">
+        $${(result.final || 0).toLocaleString('en-US', {minimumFractionDigits:2})}
+      </div>
+      <div class="stat-sub">Initial: $${(result.initial || 0).toLocaleString()}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg Win / Avg Loss</div>
+      <div class="stat-val" style="font-size:18px;">
+        <span style="color:var(--green)">${fmtMoney(result.avg_win || 0)}</span> / <span style="color:var(--red)">${fmtMoney(result.avg_loss || 0)}</span>
+      </div>
+      <div class="stat-sub">Avg RR: ${result.avg_rr ? result.avg_rr.toFixed(2) : '—'}:1</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Largest Win / Loss</div>
+      <div class="stat-val" style="font-size:18px;">
+        <span style="color:var(--green)">${fmtMoney(result.largest_win || 0)}</span> / <span style="color:var(--red)">${fmtMoney(result.largest_loss || 0)}</span>
+      </div>
+      <div class="stat-sub">${result.date_range || '—'}</div>
     </div>
   `;
 
+  // Staggered entrance for stat cards
+  staggerEntrance($('bt-stats'), 100);
+
+  // Config display
+  const retraceLabel = cfg.retrace_enabled ? 'Retrace ON' : 'Retrace OFF';
+  $('bt-config').textContent = `TP ${cfg.tp_multiplier || '—'}:1  Range ${cfg.min_range_points || '—'}  ${retraceLabel}`;
+
+  // Equity curve chart
+  const eq = result.eq_curve || [];
+  if (btChart && eq.length) {
+    btChart.data.labels = eq.map(e => e.time || '');
+    btChart.data.datasets[0].data = eq.map(e => e.balance || 0);
+    btChart.update('none');
+  }
+
   // Win Rate Comparison
-  const act = result.actual || {win_rate: 0, wins:0, losses:0, total:0};
-  document.getElementById('wr-rows').innerHTML = `
+  const act = result.actual || {win_rate: null, wins:0, losses:0, total:0};
+  $('wr-rows').innerHTML = `
     <div class="wr-item">
       <div class="wr-item-head">
         <span class="wr-item-label">Backtest Win Rate</span>
-        <span class="wr-item-val" style="color:${result.win_rate >= 50 ? 'var(--green)' : 'var(--red)'}">${result.win_rate.toFixed(1)}%</span>
+        <span class="wr-item-val" style="color:${result.win_rate >= 50 ? 'var(--green)' : 'var(--red)'}">${(result.win_rate || 0).toFixed(1)}%</span>
       </div>
-      <div class="wr-bar-bg"><div class="wr-bar" style="width:${result.win_rate}%; background:${result.win_rate >= 50 ? 'var(--green)' : 'var(--red)'}"></div></div>
+      <div class="wr-bar-bg"><div class="wr-bar" style="width:${result.win_rate || 0}%; background:${result.win_rate >= 50 ? 'var(--green)' : 'var(--red)'}"></div></div>
     </div>
     <div class="wr-item">
       <div class="wr-item-head">
-        <span class="wr-item-label">Live Trade Win Rate</span>
-        <span class="wr-item-val" style="color:${act.win_rate >= 50 ? 'var(--green)' : 'var(--red)'}">
-          ${act.win_rate ? act.win_rate.toFixed(1) + '%' : 'No data'}
+        <span class="wr-item-label">Live Trade Win Rate (${symbol})</span>
+        <span class="wr-item-val" style="color:${(act.win_rate || 0) >= 50 ? 'var(--green)' : 'var(--red)'}">
+          ${act.win_rate != null ? act.win_rate.toFixed(1) + '%' : 'No data'}
         </span>
       </div>
       <div class="wr-bar-bg"><div class="wr-bar" style="width:${act.win_rate || 0}%; background:${(act.win_rate || 0) >= 50 ? 'var(--green)' : 'var(--red)'}"></div></div>
@@ -842,7 +1001,7 @@ function showResult(symbol) {
 
   // Session Breakdown
   const ses = result.sessions || {};
-  document.getElementById('ses-rows').innerHTML = ['tokyo', 'london'].map(name => {
+  $('ses-rows').innerHTML = ['tokyo', 'london'].map(name => {
     const d = ses[name] || {total:0, wins:0, losses:0, win_rate:0, pnl:0};
     const color = name === 'tokyo' ? '#c084fc' : '#60a5fa';
     const pnlPos = d.pnl >= 0;
@@ -853,10 +1012,39 @@ function showResult(symbol) {
         <div class="ses-nums">
           <span class="ses-num">Trades: <span style="color:var(--purple)">${d.total}</span></span>
           <span class="ses-num">Win Rate: <span style="color:${d.win_rate >= 50 ? 'var(--green)' : 'var(--red)'}">${d.win_rate}%</span></span>
-          <span class="ses-num">P&L: <span style="color:${pnlPos ? 'var(--green)' : 'var(--red)'}">${pnlPos ? '+' : ''}$${d.pnl.toFixed(2)}</span></span>
+          <span class="ses-num">P&amp;L: <span style="color:${pnlPos ? 'var(--green)' : 'var(--red)'}">${pnlPos ? '+' : ''}$${d.pnl.toFixed(2)}</span></span>
         </div>
       </div>`;
   }).join('');
+
+  // Trade Details Table
+  const trades = result.trades || [];
+  $('bt-trade-count').textContent = trades.length;
+  if (trades.length) {
+    $('bt-tbody').innerHTML = trades.map((t, i) => {
+      const isTP = t.outcome === 'tp';
+      const isSL = t.outcome === 'sl';
+      let resultText, resultClass;
+      if (isTP) { resultText = 'TP'; resultClass = 't-win'; }
+      else if (isSL) { resultText = 'SL'; resultClass = 't-loss'; }
+      else { resultText = '—'; resultClass = ''; }
+      const pnl = t.pnl || 0;
+      return `<tr>
+        <td style="color:var(--fg4)">${i + 1}</td>
+        <td style="font-size:11px;">${t.time || '—'}</td>
+        <td>${t.session || '—'}</td>
+        <td class="${t.direction === 'buy' ? 't-buy' : 't-sell'}">${(t.direction || '—').toUpperCase()}</td>
+        <td>${fmt(t.entry)}</td>
+        <td>${fmt(t.sl)}</td>
+        <td>${fmt(t.tp)}</td>
+        <td class="${resultClass}">${resultText}</td>
+        <td class="${pnl >= 0 ? 't-pos' : 't-neg'}" style="font-weight:700;">${fmtMoney(pnl)}</td>
+        <td style="color:var(--fg);font-weight:600;">$${(t.balance || 0).toFixed(2)}</td>
+      </tr>`;
+    }).join('');
+  } else {
+    $('bt-tbody').innerHTML = '<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--fg3);">No trades in this backtest</td></tr>';
+  }
 }
 
 // Keyboard support
@@ -868,5 +1056,7 @@ document.addEventListener('keydown', e => {
     }
   }
 });
+
+initBtChart();
 </script>
 {% endblock %}

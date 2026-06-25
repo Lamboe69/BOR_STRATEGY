@@ -25,6 +25,53 @@
   --rx: 9999px;
 }
 
+/* ── SESSION BREAKDOWN ── */
+.ses-breakdown {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-top: 12px;
+  margin-bottom: 40px;
+}
+
+.ses-card {
+  background: var(--bg3);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 22px 20px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.4);
+  transition: all 0.3s ease;
+}
+.ses-card:hover { border-color: var(--purple); transform: translateY(-8px); box-shadow: 0 25px 60px rgba(168, 85, 247, 0.25); }
+.ses-head { font-size: 11px; font-weight: 700; color: var(--fg2); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 14px; display: flex; align-items: center; gap: 10px; }
+.ses-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.ses-dot.tky { background: #c084fc; box-shadow: 0 0 12px #c084fc; }
+.ses-dot.ldn { background: #60a5fa; box-shadow: 0 0 12px #60a5fa; }
+.ses-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.ses-item { display: flex; flex-direction: column; gap: 2px; }
+.ses-item-label { font-size: 9px; color: var(--fg3); text-transform: uppercase; letter-spacing: 0.5px; }
+.ses-item-val { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 700; color: var(--fg); }
+.ses-item-val.pos { color: var(--green); }
+.ses-item-val.neg { color: var(--red); }
+
+/* ── SYMBOL TABLE ── */
+.sym-table { width: 100%; border-collapse: collapse; }
+.sym-table th { background: rgba(255,255,255,0.045); color: var(--fg2); padding: 11px 12px; font-size: 9.8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.9px; border-bottom: 1px solid var(--border); text-align: left; position: sticky; top: 0; z-index: 10; }
+.sym-table td { padding: 11px 12px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--fg3); border-bottom: 1px solid rgba(255,255,255,0.04); }
+.sym-table tr:hover td { background: rgba(168, 85, 247, 0.09); color: var(--fg); }
+
+/* ── TRADE ROW STYLES ── */
+.t-pos { color: var(--green); }
+.t-neg { color: var(--red); }
+.t-buy { color: var(--cyan); }
+.t-sell { color: var(--amber); }
+.t-win { color: var(--green); font-weight: 600; }
+.t-loss { color: var(--red); font-weight: 600; }
+.t-neutral { color: var(--fg3); font-weight: 600; }
+
+/* ── RESPONSIVE ── */
+
 /* ── PAGE BACKGROUND ── */
 .content {
   padding: 32px 28px 50px;
@@ -232,6 +279,14 @@
   .stat-val {
     font-size: 28px;
   }
+  .ses-breakdown {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .ses-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
   .chart-container {
     height: 400px;
   }
@@ -320,6 +375,14 @@
     font-size: 9px;
     padding: 4px 8px;
   }
+  .ses-breakdown { gap: 10px; }
+  .ses-card { padding: 14px 12px; }
+  .ses-card:hover { transform: translateY(-3px); }
+  .ses-head { font-size: 9.5px; }
+  .ses-item-val { font-size: 15px; }
+  .sym-table th, .sym-table td { padding: 8px 8px; font-size: 10px; }
+  .stat-card:hover { transform: translateY(-5px) scale(1.02); }
+  .chart-panel:hover { transform: translateY(-4px); }
 }
 </style>
 {% endblock %}
@@ -331,35 +394,61 @@
     <!-- STATS GRID -->
     <div class="stats-grid">
       <div class="stat-card">
-        <div class="stat-label">Initial Balance</div>
+        <div class="stat-label">Period Start</div>
         <div class="stat-val" id="s-initial">$0.00</div>
       </div>
-      
       <div class="stat-card">
         <div class="stat-label">Current Balance</div>
         <div class="stat-val" id="s-balance">$0.00</div>
       </div>
-      
       <div class="stat-card">
         <div class="stat-label">Current Equity</div>
         <div class="stat-val" id="s-equity">$0.00</div>
       </div>
-      
       <div class="stat-card">
-        <div class="stat-label">Total P&L</div>
+        <div class="stat-label">Total P&amp;L</div>
         <div class="stat-val" id="s-pnl">$0.00</div>
         <div class="stat-sub" id="s-pnl-pct">0.00%</div>
       </div>
-      
+      <div class="stat-card">
+        <div class="stat-label">Total Trades</div>
+        <div class="stat-val" id="s-trades" style="font-size:28px;">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Win Rate</div>
+        <div class="stat-val" id="s-wr">0.0%</div>
+        <div class="stat-sub" id="s-wl">0W / 0L</div>
+      </div>
       <div class="stat-card">
         <div class="stat-label">Peak Balance</div>
         <div class="stat-val" id="s-peak">$0.00</div>
       </div>
-      
       <div class="stat-card">
         <div class="stat-label">Drawdown</div>
         <div class="stat-val" id="s-dd">$0.00</div>
         <div class="stat-sub" id="s-dd-pct">0.00%</div>
+      </div>
+    </div>
+
+    <!-- SESSION BREAKDOWN -->
+    <div class="ses-breakdown">
+      <div class="ses-card">
+        <div class="ses-head"><span class="ses-dot tky"></span>Tokyo Session</div>
+        <div class="ses-grid">
+          <div class="ses-item"><span class="ses-item-label">Trades</span><span class="ses-item-val" id="ses-tky-trades">0</span></div>
+          <div class="ses-item"><span class="ses-item-label">Win Rate</span><span class="ses-item-val" id="ses-tky-wr">—</span></div>
+          <div class="ses-item"><span class="ses-item-label">W / L</span><span class="ses-item-val" id="ses-tky-wl">0/0</span></div>
+          <div class="ses-item"><span class="ses-item-label">P&amp;L</span><span class="ses-item-val" id="ses-tky-pnl">—</span></div>
+        </div>
+      </div>
+      <div class="ses-card">
+        <div class="ses-head"><span class="ses-dot ldn"></span>London Session</div>
+        <div class="ses-grid">
+          <div class="ses-item"><span class="ses-item-label">Trades</span><span class="ses-item-val" id="ses-ldn-trades">0</span></div>
+          <div class="ses-item"><span class="ses-item-label">Win Rate</span><span class="ses-item-val" id="ses-ldn-wr">—</span></div>
+          <div class="ses-item"><span class="ses-item-label">W / L</span><span class="ses-item-val" id="ses-ldn-wl">0/0</span></div>
+          <div class="ses-item"><span class="ses-item-label">P&amp;L</span><span class="ses-item-val" id="ses-ldn-pnl">—</span></div>
+        </div>
       </div>
     </div>
 
@@ -368,7 +457,7 @@
       <div class="chart-head">
         <div class="chart-title">
           <div class="chart-title-bar" style="background:linear-gradient(180deg,var(--green),var(--cyan))"></div>
-          Balance & Equity Chart
+          Balance &amp; Equity Chart
         </div>
         <div class="time-range">
           <button class="time-btn active" onclick="setTimeRange('all')">All</button>
@@ -384,25 +473,52 @@
       </div>
     </div>
 
-    <!-- SYMBOL PERFORMANCE CHART -->
-    <div class="chart-panel" style="margin-bottom: 0;">
+    <!-- SYMBOL SUMMARY TABLE -->
+    <div class="chart-panel">
       <div class="chart-head">
         <div class="chart-title">
           <div class="chart-title-bar" style="background:linear-gradient(180deg,var(--purple),var(--blue))"></div>
           Symbol Performance
         </div>
-        <div style="display:flex; align-items:center; gap:12px;">
-          <select id="symbol-select" onchange="loadSymbolPerformance()" style="padding:6px 14px; border-radius:8px; background:var(--bg2); border:1px solid var(--border); color:var(--fg); font-size:12px; font-weight:600; cursor:pointer;">
-            <option value="">Select Symbol...</option>
-          </select>
-          <div style="font-size:11px; color:var(--fg2); font-family:'JetBrains Mono',monospace;">
-            <span id="symbol-stats">—</span>
-          </div>
+        <span class="cnt" id="sym-count" style="font-size:10px; font-weight:700; padding:4px 12px; border-radius:999px; background:rgba(255,255,255,0.08); color:var(--fg2);">0</span>
+      </div>
+      <div class="chart-body" style="padding:0;">
+        <div style="overflow-x:auto;">
+          <table class="sym-table">
+            <thead>
+              <tr>
+                <th>Symbol</th><th>Trades</th><th>Wins</th><th>Losses</th><th>Win Rate</th><th>P&amp;L</th>
+              </tr>
+            </thead>
+            <tbody id="sym-tbody">
+              <tr><td colspan="6" style="text-align:center;padding:24px;color:var(--fg3);font-size:13px;">No trade data yet</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
-      <div class="chart-body">
-        <div class="chart-container">
-          <canvas id="symbolChart"></canvas>
+    </div>
+
+    <!-- TRADE HISTORY -->
+    <div class="chart-panel" style="margin-bottom: 0;">
+      <div class="chart-head">
+        <div class="chart-title">
+          <div class="chart-title-bar" style="background:linear-gradient(180deg,var(--green),var(--cyan))"></div>
+          Recent Trades
+        </div>
+        <span class="cnt" id="hist-count" style="font-size:10px; font-weight:700; padding:4px 12px; border-radius:999px; background:rgba(255,255,255,0.08); color:var(--fg2);">0</span>
+      </div>
+      <div class="chart-body" style="padding:0;">
+        <div style="overflow-x:auto;max-height:340px;overflow-y:auto;">
+          <table class="sym-table" style="min-width:800px;">
+            <thead>
+              <tr>
+                <th>Symbol</th><th>Dir</th><th>Session</th><th>Entry</th><th>SL</th><th>TP</th><th>P&amp;L</th><th>Result</th><th>Time</th>
+              </tr>
+            </thead>
+            <tbody id="hist-tbody">
+              <tr><td colspan="9" style="text-align:center;padding:24px;color:var(--fg3);font-size:13px;">No trade history yet</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -415,11 +531,12 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
 let perfChart = null;
-let symbolChart = null;
 let fullData = { labels: [], balances: [], equities: [] };
 let currentRange = 'all';
 
 const $ = id => document.getElementById(id);
+const fmt = (v, d=5) => typeof v==='number' ? v.toFixed(d) : (v ?? '—');
+const fmtMoney = v => (v>=0?'+$':'-$') + Math.abs(v).toFixed(2);
 
 function initChart() {
   const ctx = $('perfChart');
@@ -459,66 +576,33 @@ function initChart() {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      interaction: {
-        intersect: false,
-        mode: 'index'
-      },
+      interaction: { intersect: false, mode: 'index' },
       plugins: {
         legend: {
-          display: true,
-          position: 'top',
-          labels: {
-            color: '#a5b4fc',
-            font: { size: 13, weight: '700' },
-            padding: 20,
-            usePointStyle: true,
-            pointStyle: 'circle'
-          }
+          display: true, position: 'top',
+          labels: { color: '#a5b4fc', font: { size: 13, weight: '700' }, padding: 20, usePointStyle: true, pointStyle: 'circle' }
         },
         tooltip: {
           backgroundColor: 'rgba(20, 20, 35, 0.98)',
-          titleColor: '#e0e7ff',
-          bodyColor: '#a5b4fc',
-          borderColor: 'rgba(168, 85, 247, 0.6)',
-          borderWidth: 2,
-          padding: 16,
-          displayColors: true,
-          titleFont: { size: 13, weight: '700' },
-          bodyFont: { size: 12, weight: '600' },
+          titleColor: '#e0e7ff', bodyColor: '#a5b4fc',
+          borderColor: 'rgba(168, 85, 247, 0.6)', borderWidth: 2, padding: 16,
+          titleFont: { size: 13, weight: '700' }, bodyFont: { size: 12, weight: '600' },
           callbacks: {
-            label: function(context) {
-              return context.dataset.label + ': $' + context.parsed.y.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            label: function(ctx) {
+              return ctx.dataset.label + ': $' + ctx.parsed.y.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
             }
           }
         }
       },
       scales: {
         x: {
-          display: true,
-          grid: {
-            color: 'rgba(120, 100, 255, 0.1)',
-            drawBorder: false
-          },
-          ticks: {
-            color: '#818cf8',
-            font: { size: 11, weight: '600' },
-            maxRotation: 0,
-            autoSkip: true,
-            maxTicksLimit: 10
-          }
+          grid: { color: 'rgba(120, 100, 255, 0.1)', drawBorder: false },
+          ticks: { color: '#818cf8', font: { size: 11, weight: '600' }, maxRotation: 0, autoSkip: true, maxTicksLimit: 10 }
         },
         y: {
-          display: true,
-          grid: {
-            color: 'rgba(120, 100, 255, 0.1)',
-            drawBorder: false
-          },
-          ticks: {
-            color: '#818cf8',
-            font: { size: 11, weight: '600' },
-            callback: function(value) {
-              return '$' + value.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0});
-            }
+          grid: { color: 'rgba(120, 100, 255, 0.1)', drawBorder: false },
+          ticks: { color: '#818cf8', font: { size: 11, weight: '600' },
+            callback: function(v) { return '$' + v.toLocaleString('en-US', {minimumFractionDigits:0, maximumFractionDigits:0}); }
           }
         }
       }
@@ -528,131 +612,141 @@ function initChart() {
 
 function setTimeRange(range) {
   currentRange = range;
-  
-  // Update button states
   document.querySelectorAll('.time-btn').forEach(btn => {
-    btn.classList.remove('active');
-    if (btn.textContent.toLowerCase() === range.toLowerCase() || 
-        (range === 'all' && btn.textContent === 'All') ||
-        (range === '1h' && btn.textContent === '1H') ||
-        (range === '4h' && btn.textContent === '4H') ||
-        (range === 'today' && btn.textContent === 'Today')) {
-      btn.classList.add('active');
-    }
+    btn.classList.toggle('active', btn.textContent.toLowerCase() === range.toLowerCase());
   });
-  
-  // Filter data based on range
   updateChartData();
 }
 
 function updateChartData() {
   if (!fullData.labels.length) return;
-  
-  let filteredLabels = fullData.labels;
-  let filteredBalances = fullData.balances;
-  let filteredEquities = fullData.equities;
   let startIdx = 0;
-  
   if (currentRange !== 'all') {
     const now = new Date();
-    let cutoffTime;
-    
-    if (currentRange === '1h') {
-      cutoffTime = new Date(now.getTime() - 60 * 60 * 1000);
-    } else if (currentRange === '4h') {
-      cutoffTime = new Date(now.getTime() - 4 * 60 * 60 * 1000);
-    } else if (currentRange === 'today') {
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-      cutoffTime = new Date(todayStart.getTime() - now.getTimezoneOffset() * 60000);
-    }
-    
-    // Find index where to start
+    let cutoff = new Date();
+    if (currentRange === '1h') cutoff = new Date(now.getTime() - 3600000);
+    else if (currentRange === '4h') cutoff = new Date(now.getTime() - 14400000);
+    else if (currentRange === 'today') cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     for (let i = 0; i < fullData.timestamps.length; i++) {
-      const timestamp = new Date(fullData.timestamps[i]);
-      if (timestamp >= cutoffTime) {
-        startIdx = i;
-        break;
-      }
+      if (new Date(fullData.timestamps[i]) >= cutoff) { startIdx = i; break; }
     }
-    
-    filteredLabels = fullData.labels.slice(startIdx);
-    filteredBalances = fullData.balances.slice(startIdx);
-    filteredEquities = fullData.equities.slice(startIdx);
   }
-  
-  // Update stats based on filtered data
-  if (filteredBalances.length > 0) {
-    const periodInitial = filteredBalances[0];
-    const currentBalance = filteredBalances[filteredBalances.length - 1];
-    const currentEquity = filteredEquities[filteredEquities.length - 1];
-    const periodPnl = currentBalance - periodInitial;
-    const periodPct = (periodPnl / periodInitial * 100);
-    const periodPeak = Math.max(...filteredBalances);
-    const periodDD = periodPeak - currentBalance;
-    const periodDDPct = (periodDD / periodPeak * 100);
-    
-    // Update Initial Balance based on time range
-    $('s-initial').textContent = '$' + periodInitial.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-    
-    // Update P&L for this period
-    $('s-pnl').textContent = (periodPnl >= 0 ? '+$' : '-$') + Math.abs(periodPnl).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-    $('s-pnl').className = 'stat-val ' + (periodPnl >= 0 ? 'pos' : 'neg');
-    $('s-pnl-pct').textContent = (periodPct >= 0 ? '+' : '') + periodPct.toFixed(2) + '%';
-    
-    // Update Peak Balance for this period
-    $('s-peak').textContent = '$' + periodPeak.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-    
-    // Update Drawdown for this period
-    $('s-dd').textContent = '$' + periodDD.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-    $('s-dd').className = 'stat-val ' + (periodDD > 0 ? 'neg' : '');
-    $('s-dd-pct').textContent = periodDDPct.toFixed(2) + '%';
+  const bal = fullData.balances.slice(startIdx);
+  const eq  = fullData.equities.slice(startIdx);
+  const lbl = fullData.labels.slice(startIdx);
+  if (bal.length > 0) {
+    const init = bal[0], cur = bal[bal.length-1], eqc = eq[eq.length-1];
+    const pnl = cur - init, pct = (pnl / init * 100);
+    const peak = Math.max(...bal), dd = peak - cur, ddpct = (dd / peak * 100);
+    $('s-initial').textContent = '$' + init.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+    $('s-pnl').textContent = (pnl >= 0 ? '+$' : '-$') + Math.abs(pnl).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+    $('s-pnl').className = 'stat-val ' + (pnl >= 0 ? 'pos' : 'neg');
+    $('s-pnl-pct').textContent = (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%';
+    $('s-peak').textContent = '$' + peak.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+    $('s-dd').textContent = '$' + dd.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+    $('s-dd').className = 'stat-val ' + (dd > 0 ? 'neg' : '');
+    $('s-dd-pct').textContent = ddpct.toFixed(2) + '%';
   }
-  
-  perfChart.data.labels = filteredLabels;
-  perfChart.data.datasets[0].data = filteredBalances;
-  perfChart.data.datasets[1].data = filteredEquities;
+  perfChart.data.labels = lbl;
+  perfChart.data.datasets[0].data = bal;
+  perfChart.data.datasets[1].data = eq;
   perfChart.update('none');
 }
 
 async function updatePerformance() {
   try {
     const p = await fetch('/performance').then(r => r.json());
-    
-    // Update Current Balance and Equity (these always show current values)
     const balance = p.current_balance || 0;
     const equity = p.current_equity || 0;
-    
-    $('s-balance').textContent = '$' + balance.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-    
-    $('s-equity').textContent = '$' + equity.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+    $('s-balance').textContent = '$' + balance.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+    flashEl($('s-balance'));
+    $('s-equity').textContent = '$' + equity.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
     $('s-equity').className = 'stat-val ' + (equity >= balance ? 'pos' : 'neg');
-    
-    // Update chart data
+    flashEl($('s-equity'));
+
+    // Trade stats
+    $('s-trades').textContent = p.total_trades ?? 0;
+    const wr = p.win_rate;
+    $('s-wr').textContent = wr != null ? wr.toFixed(1) + '%' : '0.0%';
+    $('s-wr').className = 'stat-val ' + (wr >= 50 ? 'pos' : wr > 0 ? 'neg' : '');
+    $('s-wl').textContent = (p.wins ?? 0) + 'W / ' + (p.losses ?? 0) + 'L';
+
+    // Session breakdown
+    const ses = p.session_summary || {};
+    for (const [key, pfx] of [['tokyo','tky'],['london','ldn']]) {
+      const d = ses[key] || {};
+      $(`ses-${pfx}-trades`).textContent = d.trade_count ?? 0;
+      const swr = d.win_rate;
+      $(`ses-${pfx}-wr`).textContent = swr != null ? swr.toFixed(1) + '%' : '—';
+      $(`ses-${pfx}-wr`).className = 'ses-item-val ' + (swr >= 50 ? 'pos' : swr > 0 ? 'neg' : '');
+      $(`ses-${pfx}-wl`).textContent = (d.wins ?? 0) + '/' + (d.losses ?? 0);
+    }
+    // Session P&L from trade history (not in session_summary, compute from recent trades)
+    // Actually session P&L: we don't have it pre-computed, so skip for now
+
+    // Symbol summary table
+    const symSum = p.symbol_summary || {};
+    const symKeys = Object.keys(symSum);
+    $('sym-count').textContent = symKeys.length;
+    if (symKeys.length) {
+      $('sym-tbody').innerHTML = symKeys.map(sym => {
+        const st = symSum[sym];
+        const total = st.trades || 0;
+        const wrVal = st.win_rate || 0;
+        const pnlVal = st.pnl || 0;
+        return `<tr>
+          <td style="font-weight:600;color:var(--fg);">${sym}</td>
+          <td>${total}</td>
+          <td style="color:var(--green);">${st.wins}</td>
+          <td style="color:var(--red);">${st.losses}</td>
+          <td style="color:${wrVal >= 50 ? 'var(--green)' : 'var(--red)'};font-weight:600;">${wrVal.toFixed(1)}%</td>
+          <td style="color:${pnlVal >= 0 ? 'var(--green)' : 'var(--red)'};font-weight:700;">${fmtMoney(pnlVal)}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    // Recent trade history
+    const hist = p.recent_trades || [];
+    $('hist-count').textContent = hist.length;
+    if (hist.length) {
+      $('hist-tbody').innerHTML = hist.map(t => {
+        const reason = t.close_reason || 'closed';
+        const isTP = reason === 'tp';
+        const isSL = reason === 'sl';
+        let resultText, resultClass;
+        if (isTP) { resultText = '✓ TP'; resultClass = 't-win'; }
+        else if (isSL) { resultText = '✗ SL'; resultClass = 't-loss'; }
+        else { resultText = '◆ CLOSED'; resultClass = 't-neutral'; }
+        const apnl = t.actual_pnl != null ? t.actual_pnl : 0;
+        return `<tr>
+          <td style="font-weight:600;color:var(--fg);">${t.symbol || '—'}</td>
+          <td class="${t.direction==='buy'?'t-buy':'t-sell'}">${(t.direction||'—').toUpperCase()}</td>
+          <td>${t.session || '—'}</td>
+          <td>${fmt(t.entry)}</td>
+          <td>${fmt(t.sl)}</td>
+          <td>${fmt(t.tp)}</td>
+          <td style="color:${apnl >= 0 ? 'var(--green)' : 'var(--red)'};font-weight:700;">${fmtMoney(apnl)}</td>
+          <td class="${resultClass}">${resultText}</td>
+          <td>${t.time || t.closed_at || '—'}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    // Chart
     if (p.history && p.history.length > 0) {
       fullData.timestamps = p.history.map(h => h.time);
-      
-      // Smart label formatting based on data range
       const firstTime = new Date(p.history[0].time);
       const lastTime = new Date(p.history[p.history.length - 1].time);
-      const timeRangeHours = (lastTime - firstTime) / (1000 * 60 * 60);
-      
+      const rangeHours = (lastTime - firstTime) / 3600000;
       fullData.labels = p.history.map(h => {
         const d = new Date(h.time);
-        
-        // If data spans more than 24 hours, show date + time
-        if (timeRangeHours > 24) {
-          return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' +
-                 d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-        } else {
-          // Less than 24 hours, just show time
-          return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-        }
+        return rangeHours > 24
+          ? d.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ' ' + d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})
+          : d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
       });
-      
       fullData.balances = p.history.map(h => h.balance);
       fullData.equities = p.history.map(h => h.equity);
-      
-      // Update chart and stats based on current time range
       updateChartData();
     }
   } catch(e) {
@@ -661,188 +755,12 @@ async function updatePerformance() {
 }
 
 initChart();
-setInterval(updatePerformance, 3000);  // Update every 3 seconds
+
+// Animate cards in on first load
+setTimeout(() => staggerEntrance(document.querySelector('.stats-grid'), 80), 100);
+setTimeout(() => staggerEntrance(document.querySelector('.ses-breakdown'), 100), 300);
+
+setInterval(updatePerformance, 3000);
 updatePerformance();
-
-// Initialize Symbol Performance Chart
-function initSymbolChart() {
-  const ctx = $('symbolChart');
-  symbolChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: [],
-      datasets: [
-        {
-          label: 'Cumulative P&L',
-          data: [],
-          borderColor: '#a855f7',
-          borderWidth: 3,
-          tension: 0.4,
-          fill: false,
-          pointRadius: 4,
-          pointHoverRadius: 8,
-          pointBackgroundColor: '#a855f7',
-          pointHoverBackgroundColor: '#a855f7',
-          pointBorderColor: '#fff',
-          pointHoverBorderWidth: 2
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: {
-        intersect: false,
-        mode: 'index'
-      },
-      plugins: {
-        legend: {
-          display: true,
-          position: 'top',
-          labels: {
-            color: '#a5b4fc',
-            font: { size: 13, weight: '700' },
-            padding: 20,
-            usePointStyle: true,
-            pointStyle: 'circle'
-          }
-        },
-        tooltip: {
-          backgroundColor: 'rgba(20, 20, 35, 0.98)',
-          titleColor: '#e0e7ff',
-          bodyColor: '#a5b4fc',
-          borderColor: 'rgba(168, 85, 247, 0.6)',
-          borderWidth: 2,
-          padding: 16,
-          displayColors: true,
-          titleFont: { size: 13, weight: '700' },
-          bodyFont: { size: 12, weight: '600' },
-          callbacks: {
-            label: function(context) {
-              const val = context.parsed.y;
-              return 'P&L: ' + (val >= 0 ? '+$' : '-$') + Math.abs(val).toFixed(2);
-            }
-          }
-        }
-      },
-      scales: {
-        x: {
-          display: true,
-          grid: {
-            color: 'rgba(120, 100, 255, 0.1)',
-            drawBorder: false
-          },
-          ticks: {
-            color: '#818cf8',
-            font: { size: 11, weight: '600' },
-            maxRotation: 45,
-            autoSkip: true,
-            maxTicksLimit: 10
-          }
-        },
-        y: {
-          display: true,
-          grid: {
-            color: 'rgba(120, 100, 255, 0.1)',
-            drawBorder: false
-          },
-          ticks: {
-            color: '#818cf8',
-            font: { size: 11, weight: '600' },
-            callback: function(value) {
-              return (value >= 0 ? '+$' : '-$') + Math.abs(value).toFixed(0);
-            }
-          }
-        }
-      }
-    }
-  });
-}
-
-initSymbolChart();
-
-// Load symbols into dropdown
-async function loadSymbols() {
-  try {
-    const response = await fetch('/state');
-    const state = await response.json();
-    const symbols = state.symbols || [];
-    
-    const select = $('symbol-select');
-    select.innerHTML = '<option value="">Select Symbol...</option>';
-    
-    symbols.forEach(sym => {
-      const option = document.createElement('option');
-      option.value = sym;
-      option.textContent = sym;
-      select.appendChild(option);
-    });
-  } catch(e) {
-    console.log('Failed to load symbols:', e);
-  }
-}
-
-loadSymbols();
-
-// Load performance data for selected symbol
-async function loadSymbolPerformance() {
-  const symbol = $('symbol-select').value;
-  
-  if (!symbol) {
-    // Clear chart
-    symbolChart.data.labels = [];
-    symbolChart.data.datasets[0].data = [];
-    symbolChart.update();
-    $('symbol-stats').textContent = '—';
-    return;
-  }
-  
-  try {
-    const response = await fetch(`/performance/symbol/${symbol}`);
-    const data = await response.json();
-    
-    if (data.error) {
-      console.error('Error loading symbol performance:', data.error);
-      return;
-    }
-    
-    // Update stats display
-    const winRate = data.win_rate || 0;
-    const totalPnl = data.total_pnl || 0;
-    const statsText = `${data.total_trades} trades | ${data.wins}W/${data.losses}L | ${winRate.toFixed(1)}% WR | ${totalPnl >= 0 ? '+' : ''}$${totalPnl.toFixed(2)}`;
-    $('symbol-stats').textContent = statsText;
-    $('symbol-stats').style.color = totalPnl >= 0 ? 'var(--green)' : 'var(--red)';
-    
-    // Update chart
-    if (data.history && data.history.length > 0) {
-      const labels = data.history.map(h => {
-        const d = new Date(h.time);
-        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' +
-               d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-      });
-      
-      const pnlData = data.history.map(h => h.cumulative_pnl);
-      
-      symbolChart.data.labels = labels;
-      symbolChart.data.datasets[0].data = pnlData;
-      symbolChart.data.datasets[0].label = `${symbol} Cumulative P&L`;
-      
-      // Update line color based on final P&L
-      const finalPnl = pnlData[pnlData.length - 1] || 0;
-      symbolChart.data.datasets[0].borderColor = finalPnl >= 0 ? '#34d399' : '#f87171';
-      symbolChart.data.datasets[0].pointBackgroundColor = finalPnl >= 0 ? '#34d399' : '#f87171';
-      symbolChart.data.datasets[0].pointHoverBackgroundColor = finalPnl >= 0 ? '#34d399' : '#f87171';
-      
-      symbolChart.update();
-    } else {
-      // No trade history
-      symbolChart.data.labels = [];
-      symbolChart.data.datasets[0].data = [];
-      symbolChart.update();
-    }
-  } catch(e) {
-    console.log('Failed to load symbol performance:', e);
-  }
-}
 </script>
 {% endblock %}

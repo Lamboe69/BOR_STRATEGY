@@ -242,6 +242,46 @@ class TradesDB:
             "avg_loss": round(sum(losses) / len(losses) if losses else 0, 2),
         }
     
+    def get_daily_pnl(self, date_str: str = None) -> dict:
+        """Get P&L for a specific date (YYYY-MM-DD) or today."""
+        if date_str is None:
+            date_str = datetime.datetime.utcnow().strftime("%Y-%m-%d")
+        closed = self.data.get("closed_trades", [])
+        daily = [t for t in closed if t.get("closed_at", "").startswith(date_str)]
+        wins = sum(1 for t in daily if t.get("close_reason") == "tp")
+        losses = sum(1 for t in daily if t.get("close_reason") == "sl")
+        pnl = sum(t.get("actual_pnl", 0) for t in daily)
+        return {
+            "date": date_str,
+            "trades": len(daily),
+            "wins": wins,
+            "losses": losses,
+            "pnl": round(pnl, 2),
+        }
+
+    def get_risk_stats(self) -> dict:
+        """Get risk management statistics."""
+        closed = self.data.get("closed_trades", [])
+        total = len(closed)
+        if not total:
+            return {"total_trades": 0, "consecutive_losses": 0,
+                    "daily_pnl": 0.0, "daily_trades": 0}
+        # Consecutive losses (from most recent)
+        consecutive_losses = 0
+        for t in reversed(closed):
+            if t.get("close_reason") == "sl":
+                consecutive_losses += 1
+            else:
+                break
+        today = datetime.datetime.utcnow().strftime("%Y-%m-%d")
+        daily = self.get_daily_pnl(today)
+        return {
+            "total_trades": total,
+            "consecutive_losses": consecutive_losses,
+            "daily_pnl": daily["pnl"],
+            "daily_trades": daily["trades"],
+        }
+
     def get_database_info(self) -> dict:
         """Get information about the database (for monitoring)"""
         return {

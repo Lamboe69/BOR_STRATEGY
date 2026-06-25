@@ -3,17 +3,21 @@ live_bot.py — BOR Strategy live trading bot via MetaTrader 5 Python API.
 Writes bor_state.json every poll cycle so the dashboard UI can read it.
 """
 
-import sys, time, logging, json
+import sys, time, logging, json, os
 import datetime
 import pytz
 from pathlib import Path
+from logging.handlers import RotatingFileHandler
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import MetaTrader5 as mt5
-from bor_logic import BORStrategy, in_session
+from bor_logic import BORStrategy, in_session, BORLevels, sort4
 from trades_db import TradesDB
 from performance_tracker import save_snapshot, get_stats
+from python_mt5.alerts import (send_telegram, notify_trade, notify_close,
+                               notify_error, notify_daily_pnl,
+                               notify_risk_pause, notify_daily_reset)
 
 ROOT          = Path(__file__).resolve().parent.parent
 STATE_FILE    = ROOT / "bor_state.json"
@@ -21,10 +25,12 @@ SETTINGS_FILE = ROOT / "bor_settings.json"
 LOG_FILE      = ROOT / "bor_live.log"
 TRADES_DB_FILE = ROOT / "bor_trades.db.json"
 
+handler = RotatingFileHandler(str(LOG_FILE), maxBytes=5*1024*1024, backupCount=3)
+handler.setFormatter(logging.Formatter("%(asctime)s  %(levelname)-8s  %(message)s"))
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s  %(levelname)-8s  %(message)s",
-    handlers=[logging.StreamHandler(), logging.FileHandler(str(LOG_FILE))],
+    handlers=[handler, logging.StreamHandler()],
 )
 log = logging.getLogger("BOR-Live")
 UTC = pytz.utc
@@ -85,7 +91,7 @@ _state = {
     "equity":     0.0,
     "currency":   "USD",
     "server":     "",
-    "symbols":    SYMBOLS,
+    "symbols":    SYMBOLS,  # will be updated with resolved names after connect()
     "last_update": "",
     "sessions": {
         "tokyo":  {"active": False, "wins": 0, "losses": 0, "trades": 0},
@@ -118,6 +124,177 @@ def _save_state():
         pass
 
 
+# ── Symbol name resolution ────────────────────────────────────────────────────
+
+_RESOLVED_SYMBOLS = {}
+
+def _resolve_symbol(symbol: str) -> str:
+    """Resolve broker symbol name (e.g. 'EURUSD' -> 'EURUSDm' for Exness)."""
+    if symbol in _RESOLVED_SYMBOLS:
+        return _RESOLVED_SYMBOLS[symbol]
+    info = mt5.symbol_info(symbol)
+    if info is not None:
+        _RESOLVED_SYMBOLS[symbol] = symbol
+        return symbol
+    for suffix in ('m', '.m', '-M', '.cash', '.spot', ''):
+        candidate = symbol + suffix
+        if candidate == symbol:
+            continue
+        info = mt5.symbol_info(candidate)
+        if info is not None:
+            _RESOLVED_SYMBOLS[symbol] = candidate
+            log.info("Resolved symbol %s -> %s", symbol, candidate)
+            return candidate
+    log.warning("Could not resolve symbol %s, using as-is", symbol)
+    _RESOLVED_SYMBOLS[symbol] = symbol
+    return symbol
+
+def _ensure_symbol(symbol: str) -> str:
+    """Resolve and enable symbol in Market Watch."""
+    sym = _resolve_symbol(symbol)
+    mt5.symbol_select(sym, True)
+    return sym
+
+
+# ── Risk management state ──────────────────────────────────────────────────────
+
+_risk = {
+    "paused": False,
+    "pause_until": None,
+    "daily_start_balance": None,
+    "daily_trades": {},       # per-symbol: {symbol: count}
+    "consecutive_losses": 0,
+    "last_notified_daily": None,
+}
+
+
+def _load_rm_config() -> dict:
+    return _load_settings().get("risk_management", {})
+
+
+def _check_risk_pause() -> bool:
+    """Check if bot is in a risk pause. Returns True if trading should be blocked."""
+    if _risk["pause_until"]:
+        if datetime.datetime.now(datetime.timezone.utc) < _risk["pause_until"]:
+            return True
+        _risk["paused"] = False
+        _risk["pause_until"] = None
+        log.info("Risk pause ended — resuming trading")
+    return False
+
+
+def _check_risk_limits(symbol: str, session: str) -> tuple[bool, str]:
+    """
+    Check all risk limits.
+    Returns (blocked: bool, reason: str).
+    """
+    rm = _load_rm_config()
+    today = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
+
+    # Daily reset
+    if _risk["daily_start_balance"] is None:
+        acct = mt5.account_info()
+        if acct:
+            _risk["daily_start_balance"] = acct.balance
+            log.info("Daily risk tracking started — balance=%.2f", acct.balance)
+
+    # Check max daily drawdown
+    max_loss_pct = float(rm.get("max_daily_loss_pct", 5.0))
+    if _risk["daily_start_balance"]:
+        acct = mt5.account_info()
+        if acct:
+            loss_pct = (acct.balance - _risk["daily_start_balance"]) / _risk["daily_start_balance"] * 100
+            if loss_pct <= -max_loss_pct:
+                dur = 60
+                _risk["pause_until"] = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=dur)
+                _risk["paused"] = True
+                msg = f"Max daily loss ({max_loss_pct}%) reached: {loss_pct:.1f}%. Pausing {dur}min"
+                log.warning(msg)
+                notify_risk_pause(msg)
+                return True, msg
+
+    # Check max daily trades (per-symbol, derived from max_trades_per_session × 2 sessions)
+    sym_trades = _risk["daily_trades"].get(symbol, 0)
+    cfg = _load_settings()
+    max_per_session = int(cfg.get("max_trades_per_session", 2))
+    max_daily = max_per_session * 2
+    if sym_trades >= max_daily:
+        msg = f"Max daily trades ({max_daily}) reached for {symbol}"
+        log.warning(msg)
+        return True, msg
+
+    # Check consecutive loss limit
+    max_cons = int(rm.get("consecutive_loss_limit", 3))
+    if _risk["consecutive_losses"] >= max_cons:
+        pause_min = int(rm.get("pause_after_loss_minutes", 15))
+        _risk["pause_until"] = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=pause_min)
+        _risk["paused"] = True
+        msg = f"Consecutive loss limit ({max_cons}) hit — pausing {pause_min}min"
+        log.warning(msg)
+        notify_risk_pause(msg)
+        return True, msg
+
+    return False, ""
+
+
+def _record_trade_result(outcome: str, symbol: str):
+    """Update risk state after a trade closes."""
+    if outcome == "sl":
+        _risk["consecutive_losses"] += 1
+    elif outcome == "tp":
+        _risk["consecutive_losses"] = 0
+    _risk["daily_trades"][symbol] = _risk["daily_trades"].get(symbol, 0) + 1
+
+
+def _record_daily_notification(balance: float):
+    """Send daily P&L notification at session transition."""
+    today = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
+    if _risk["last_notified_daily"] != today:
+        _risk["last_notified_daily"] = today
+        daily = _trades_db.get_daily_pnl(today)
+        notify_daily_pnl(today, daily["pnl"], daily["trades"],
+                         daily["wins"], daily["losses"], balance)
+        # Reset daily tracking
+        _risk["daily_start_balance"] = balance
+        _risk["daily_trades"].clear()
+        notify_daily_reset(daily["pnl"], balance)
+
+
+# ── H1 Trend Filter ───────────────────────────────────────────────────────────
+
+def _load_h1_config() -> dict:
+    return _load_settings().get("h1_trend_filter", {})
+
+
+def _get_h1_trend(symbol: str) -> str:
+    """Check H1 trend using EMA. Returns 'bullish', 'bearish', or 'neutral'."""
+    cfg = _load_h1_config()
+    if not cfg.get("enabled", True):
+        return "neutral"
+    ema_period = int(cfg.get("ema_period", 20))
+    lookback = int(cfg.get("lookback_candles", 24))
+    rates = mt5.copy_rates_from_pos(symbol, mt5.TIMEFRAME_H1, 0, lookback + ema_period)
+    if rates is None or len(rates) < ema_period + 2:
+        return "neutral"
+    closes = [r["close"] for r in rates]
+    # Simple EMA
+    k = 2 / (ema_period + 1)
+    ema = closes[:ema_period]
+    ema_val = sum(ema) / ema_period
+    for price in closes[ema_period:]:
+        ema_val = price * k + ema_val * (1 - k)
+    # Compare last 2 closes to EMA
+    last_close = closes[-1]
+    prev_close = closes[-2]
+    above_ema = last_close > ema_val and prev_close > ema_val
+    below_ema = last_close < ema_val and prev_close < ema_val
+    if above_ema:
+        return "bullish"
+    if below_ema:
+        return "bearish"
+    return "neutral"
+
+
 # ── MT5 helpers ───────────────────────────────────────────────────────────────
 
 def connect():
@@ -134,7 +311,15 @@ def connect():
     _state["equity"]    = info.equity
     _state["currency"]  = info.currency
     _state["server"]    = MT5_SERVER
-    log.info("Connected — account %d  balance %.2f %s", info.login, info.balance, info.currency)
+    # Resolve symbols to their broker names
+    resolved = []
+    for sym in SYMBOLS:
+        resolved.append(_resolve_symbol(sym))
+    _state["symbols"] = resolved
+    global _RESOLVED_SYMBOLS
+    _RESOLVED_SYMBOLS = dict(zip(SYMBOLS, resolved))
+    log.info("Connected — account %d  balance %.2f %s  symbols: %s",
+             info.login, info.balance, info.currency, resolved)
 
 
 def get_balance() -> float:
@@ -264,6 +449,17 @@ def place_order(symbol: str, direction: str, lot: float,
     # Get current spread
     spread = tick.ask - tick.bid
     
+    # Check spread against max allowed
+    rm = _load_rm_config()
+    max_spread_pips = float(rm.get("max_spread_pips", 50))
+    if sym_info:
+        spread_pips = spread / (10 ** -(sym_info.digits - 1)) if sym_info.digits > 1 else spread * 10000
+    else:
+        spread_pips = spread * 10000
+    if spread_pips > max_spread_pips:
+        log.warning("%s spread too high (%.1f pips > %.0f limit) — skipping", symbol, spread_pips, max_spread_pips)
+        return 0
+    
     # Calculate ORIGINAL SL distance from entry (before any adjustments)
     original_sl_distance = abs(entry - sl)
     
@@ -290,17 +486,27 @@ def place_order(symbol: str, direction: str, lot: float,
         log.info("SL too tight (%.5f < 2×spread %.5f) - applying buffer: original_sl=%.5f adjusted_sl=%.5f",
                  original_sl_distance, spread * 2, sl, sl_adjusted)
     
-    # Ensure minimum distance from entry (broker requirement)
-    min_distance = sym_info.trade_stops_level * sym_info.point
-    if min_distance > 0:
-        if direction == "buy":
-            sl_adjusted = min(sl_adjusted, entry - min_distance)
-        else:
-            sl_adjusted = max(sl_adjusted, entry + min_distance)
+    # If SL was adjusted, recalculate TP to maintain R:R and lot to keep dollar risk constant
+    if sl_adjusted != sl:
+        original_sl_dist = abs(entry - sl)
+        new_sl_dist = abs(entry - sl_adjusted)
+        if original_sl_dist > 0:
+            rr = abs(tp - entry) / original_sl_dist
+            new_tp_dist = new_sl_dist * rr
+            if direction == "buy":
+                tp = entry + new_tp_dist
+            else:
+                tp = entry - new_tp_dist
+        lot = calc_lot(symbol, entry, sl_adjusted)
     
-    # Decide: MARKET order or LIMIT order based on TP coverage (15% threshold)
-    if tp_coverage_pct > 15:
-        # Breakout candle covered > 15% of TP → place LIMIT order at breakout level
+    # Decide: MARKET order or LIMIT order based on retracement config
+    # (must match bor_logic.py logic: retrace_enabled AND coverage > threshold)
+    retrace_cfg = _load_settings().get("retracement", {})
+    retrace_enabled = bool(retrace_cfg.get("enabled", True))
+    coverage_threshold = float(retrace_cfg.get("coverage_threshold", 0.0))
+
+    if retrace_enabled and tp_coverage_pct > coverage_threshold:
+        # Breakout candle covered > threshold of TP → place LIMIT order at breakout level
         order_type = mt5.ORDER_TYPE_BUY_LIMIT if direction == "buy" else mt5.ORDER_TYPE_SELL_LIMIT
         limit_price = entry
         
@@ -322,12 +528,12 @@ def place_order(symbol: str, direction: str, lot: float,
             log.error("Limit order failed %s %s: %s", symbol, direction, result.comment)
             return 0
         
-        log.info("LIMIT order placed (TP coverage %.1f%% > 15%%)  %s %s  lot=%.2f  limit=%.5f  SL=%.5f  TP=%.5f  ticket=%d",
-                 tp_coverage_pct, symbol, direction.upper(), lot, limit_price, sl_adjusted, tp, result.order)
+        log.info("LIMIT order placed (retrace enabled, coverage %.1f%% > %.0f%%)  %s %s  lot=%.2f  limit=%.5f  SL=%.5f  TP=%.5f  ticket=%d",
+                 tp_coverage_pct, coverage_threshold, symbol, direction.upper(), lot, limit_price, sl_adjusted, tp, result.order)
         return result.order
     
     else:
-        # Breakout candle covered ≤ 15% of TP → place MARKET order immediately
+        # Retrace disabled or coverage below threshold → place MARKET order immediately
         order_type = mt5.ORDER_TYPE_BUY if direction == "buy" else mt5.ORDER_TYPE_SELL
         
         request = {
@@ -349,15 +555,11 @@ def place_order(symbol: str, direction: str, lot: float,
             log.error("Market order failed %s %s: %s", symbol, direction, result.comment)
             return 0
         
-        if buffer_applied:
-            adjusted_sl_distance = abs(entry - sl_adjusted)
-            rr_ratio = (abs(tp - entry) / adjusted_sl_distance) if adjusted_sl_distance > 0 else 0
-            log.info("MARKET order placed (TP coverage %.1f%% ≤ 15%%)  %s %s  lot=%.2f  entry=%.5f  SL=%.5f (adjusted from %.5f)  TP=%.5f  R/R=1:%.1f  ticket=%d",
-                     tp_coverage_pct, symbol, direction.upper(), lot, entry, sl_adjusted, sl, tp, rr_ratio, result.order)
-        else:
-            rr_ratio = (abs(tp - entry) / original_sl_distance) if original_sl_distance > 0 else 0
-            log.info("MARKET order placed (TP coverage %.1f%% ≤ 15%%)  %s %s  lot=%.2f  entry=%.5f  SL=%.5f  TP=%.5f  R/R=1:%.1f  ticket=%d",
-                     tp_coverage_pct, symbol, direction.upper(), lot, entry, sl, tp, rr_ratio, result.order)
+        final_sl_dist = abs(entry - sl_adjusted)
+        rr_ratio = (abs(tp - entry) / final_sl_dist) if final_sl_dist > 0 else 0
+        sl_label = f"{sl_adjusted:.5f} (adjusted from {sl:.5f})" if sl_adjusted != sl else f"{sl:.5f}"
+        log.info("MARKET order placed (coverage %.1f%%)  %s %s  lot=%.2f  entry=%.5f  SL=%s  TP=%.5f  R/R=1:%.1f  ticket=%d",
+                 tp_coverage_pct, symbol, direction.upper(), lot, entry, sl_label, tp, rr_ratio, result.order)
         
         return result.order
 
@@ -389,21 +591,51 @@ def close_position(ticket: int, symbol: str, direction: str, lot: float):
 # Initialize trades database
 _trades_db = TradesDB(TRADES_DB_FILE)
 
+def _symbol_per_config(sym: str) -> dict:
+    """Retrieve per-symbol config from symbols_config, falling back to globals."""
+    base = sym.upper()
+    for sfx in ('M', '.M', '-M'):
+        if base.endswith(sfx):
+            base = base[:-len(sfx)]
+            break
+    cfg = _load_settings()
+    sc = cfg.get("symbols_config", {}).get(base, {})
+    return {
+        "tp_mult": float(sc.get("tp_multiplier", cfg.get("tp_multiplier", 10))),
+        "min_range_points": float(sc.get("min_range_points", cfg.get("min_range_points", 0))),
+        "min_stop_points": int(sc.get("min_stop_points", 0)),
+        "retrace_enabled": sc.get("retrace_enabled") if "retrace_enabled" in sc else cfg.get("retracement", {}).get("enabled", True),
+        "retrace_max_bars": int(sc.get("retrace_max_bars", cfg.get("retracement", {}).get("max_wait_bars", 50))),
+        "retrace_coverage_threshold": float(sc.get("retrace_coverage_threshold", cfg.get("retracement", {}).get("coverage_threshold", 0.0))),
+    }
+
 class SymbolBot:
     def __init__(self, symbol: str):
-        self.symbol   = symbol
+        self.symbol   = _ensure_symbol(symbol)
+        self.raw_symbol = symbol  # keep original name for settings/display
+        pc = _symbol_per_config(symbol)
+        min_stop_dist = 0.0
+        if pc["min_stop_points"] > 0:
+            info = mt5.symbol_info(self.symbol)
+            if info:
+                min_stop_dist = pc["min_stop_points"] * info.point
         self.strategy = BORStrategy(
             symbol=symbol, risk_pct=RISK_PCT,
             account_balance_fn=lambda: INITIAL_BALANCE,
-            max_trades=MAX_TRADES_PER_SESSION, tp_mult=TP_MULTIPLIER,
+            max_trades=MAX_TRADES_PER_SESSION, tp_mult=pc["tp_mult"],
             tokyo_start=TOKYO_START,   tokyo_end=TOKYO_END,
             london_start=LONDON_START, london_end=LONDON_END,
+            min_range_points=pc["min_range_points"],
+            min_stop_distance=min_stop_dist,
+            retrace_enabled=pc["retrace_enabled"],
+            retrace_max_bars=pc["retrace_max_bars"],
+            retrace_coverage_threshold=pc["retrace_coverage_threshold"],
         )
         self.last_bar_time = None
         self.open_positions: dict = {}
         self.pending_orders: dict = {}  # Track pending limit orders with their TP levels
-        self.last_tokyo_init = None  # Track when Tokyo session was last initialized
-        self.last_london_init = None  # Track when London session was last initialized
+        self._tky_date = None  # Track last Tokyo session date
+        self._ldn_date = None  # Track last London session date
         
         # Restore open positions from database on startup
         self._restore_from_db()
@@ -417,7 +649,6 @@ class SymbolBot:
         latest_15m = bars_15m[-1]
         if latest_15m["time"] == self.last_bar_time:
             return
-        self.last_bar_time = latest_15m["time"]
 
         prev_15m = bars_15m[-2]   # last closed 15-min candle (pre-session levels)
         cur_15m  = bars_15m[-1]   # current/opening 15-min candle (session open levels)
@@ -426,19 +657,26 @@ class SymbolBot:
         # Check if we're entering a new session and need to reset trade_count
         tky_in = in_session(utc_dt, self.strategy.tokyo.start, self.strategy.tokyo.end)
         ldn_in = in_session(utc_dt, self.strategy.london.start, self.strategy.london.end)
-        
-        # Reset trade_count ONLY when session FIRST initializes (not on every tick)
-        if tky_in and not self.strategy.tokyo.initialized and self.last_tokyo_init != utc_dt:
-            _trades_db.reset_session_counts(self.symbol, "tokyo")
-            self.strategy.tokyo.trade_count = 0
-            self.last_tokyo_init = utc_dt
-            log.info("%s: New Tokyo session - trade_count reset to 0", self.symbol)
-        
-        if ldn_in and not self.strategy.london.initialized and self.last_london_init != utc_dt:
-            _trades_db.reset_session_counts(self.symbol, "london")
-            self.strategy.london.trade_count = 0
-            self.last_london_init = utc_dt
-            log.info("%s: New London session - trade_count reset to 0", self.symbol)
+
+        is_first_tick = self.last_bar_time is None
+
+        # Per-day session init — uses (session_start, session_start+15min) pair
+        # to compute levels, matching the backtest exactly
+        tky_date = utc_dt.date()
+        if tky_in and (self._tky_date is None or self._tky_date != tky_date):
+            self._init_session_from_history("tokyo", utc_dt, _trades_db)
+            self._tky_date = tky_date
+            if not is_first_tick:
+                log.info("%s: New Tokyo session — trade_count reset", self.symbol)
+
+        ldn_date = utc_dt.date()
+        if ldn_in and (self._ldn_date is None or self._ldn_date != ldn_date):
+            self._init_session_from_history("london", utc_dt, _trades_db)
+            self._ldn_date = ldn_date
+            if not is_first_tick:
+                log.info("%s: New London session — trade_count reset", self.symbol)
+
+        self.last_bar_time = latest_15m["time"]
 
         # Sync with MT5: check if any positions for this symbol exist that we're not tracking
         mt5_positions = mt5.positions_get(symbol=self.symbol)
@@ -497,6 +735,25 @@ class SymbolBot:
                            self.symbol, session.upper(), current_trade_count, MAX_TRADES_PER_SESSION)
                 continue
             
+            # H1 Trend Filter
+            h1_cfg = _load_h1_config()
+            if h1_cfg.get("enabled", True) and h1_cfg.get("only_trade_with_trend", True):
+                trend = _get_h1_trend(self.symbol)
+                dir = sig["direction"]
+                if trend == "bearish" and dir == "buy":
+                    log.info("%s: H1 trend BEARISH — blocking BUY signal", self.symbol)
+                    continue
+                if trend == "bullish" and dir == "sell":
+                    log.info("%s: H1 trend BULLISH — blocking SELL signal", self.symbol)
+                    continue
+                log.info("%s: H1 trend %s — OK for %s", self.symbol, trend, dir.upper())
+            
+            # Risk management check
+            blocked, reason = _check_risk_limits(self.symbol, session)
+            if blocked:
+                log.warning("%s: Risk limit BLOCKED %s - %s", self.symbol, session.upper(), reason)
+                continue
+            
             lot = calc_lot(self.symbol, sig["entry"], sig["sl"])
             ticket = place_order(self.symbol, sig["direction"],
                                  lot, sig["entry"], sig["sl"], sig["tp"], latest_15m["close"])
@@ -521,6 +778,9 @@ class SymbolBot:
                         "counted": True,  # Already counted when placed
                     }
                     log.info("Pending limit order %d - will cancel if TP reached", ticket)
+                    notify_trade(self.symbol, sig["direction"], sig["session"],
+                                 sig["entry"], sig["sl"], sig["tp"], lot,
+                                 ticket, "LIMIT")
                 else:
                     # Market order filled immediately
                     trade_data = {
@@ -539,6 +799,9 @@ class SymbolBot:
                     _trades_db.add_open_trade(ticket, trade_data)
                     log.info("Market order filled - %s %s in %s session",
                             self.symbol, sig["direction"].upper(), session.upper())
+                    notify_trade(self.symbol, sig["direction"], sig["session"],
+                                 sig["entry"], sig["sl"], sig["tp"], lot,
+                                 ticket, "MARKET")
         
         # Monitor pending limit orders and cancel if price reaches TP
         self._monitor_pending_orders()
@@ -675,6 +938,67 @@ class SymbolBot:
                 log.info("Restored position %d from database: %s %s in %s session", 
                          ticket, self.symbol, trade_data["direction"].upper(), trade_data["session"].upper())
 
+    def _init_session_from_history(self, session_name: str, current_dt: datetime.datetime, trades_db):
+        """Initialize session levels from historical M15 data when bot starts mid-session."""
+        session = getattr(self.strategy, session_name)
+        start_h, start_m = session.start
+
+        session_start = current_dt.replace(hour=start_h, minute=start_m, second=0, microsecond=0)
+        pre_bar_dt = session_start
+        session_bar_dt = session_start + datetime.timedelta(minutes=15)
+        fetch_to = current_dt + datetime.timedelta(minutes=30)
+
+        # Always reset counts at session boundary (before early return)
+        trades_db.reset_session_counts(self.symbol, session_name)
+        session.trade_count = 0
+
+        rates = mt5.copy_rates_range(self.symbol, mt5.TIMEFRAME_M15, pre_bar_dt, fetch_to)
+        if rates is None or len(rates) < 2:
+            log.warning("%s: No history for %s init — levels deferred to on_candle", self.symbol, session_name)
+            return
+
+        bars = []
+        for r in rates:
+            bars.append({
+                "time": datetime.datetime.fromtimestamp(r["time"], tz=pytz.UTC),
+                "high": float(r["high"]),
+                "low":  float(r["low"]),
+            })
+
+        session_bar = None
+        pre_bar = None
+        for i, b in enumerate(bars):
+            if b["time"] == session_bar_dt and i > 0:
+                session_bar = b
+                pre_bar = bars[i - 1]
+                break
+
+        if session_bar is None or pre_bar is None:
+            log.warning("%s: Session-open+15m candle not found for %s — levels deferred to on_candle", self.symbol, session_name)
+            return
+
+        s1, s2, s3, s4 = sort4(pre_bar["high"], pre_bar["low"], session_bar["high"], session_bar["low"])
+        session.levels = BORLevels(s1, s2, s3, s4)
+        session.initialized = True
+
+        # Re-sync DB to match open MT5 positions
+        open_pos_count = 0
+        try:
+            positions = mt5.positions_get(symbol=self.symbol)
+            if positions:
+                for pos in positions:
+                    if pos.magic in (20240101, 99999999):
+                        open_pos_count += 1
+        except Exception:
+            pass
+        for _ in range(open_pos_count):
+            trades_db.increment_trade_count(self.symbol, session_name)
+        session.trade_count = trades_db.get_trade_count(self.symbol, session_name)
+
+        log.info("%s: %s initialized from history @ %s (levels: %.5f / %.5f / %.5f / %.5f, mt5_positions: %d)",
+                 self.symbol, session_name.upper(), session_start.strftime("%H:%M"),
+                 s1, s2, s3, s4, session.trade_count)
+
     def session_stats(self):
         # Re-read session times from settings each call so the dashboard
         # always reflects the current config even without a bot restart.
@@ -767,6 +1091,7 @@ def main():
                     bot.tick()
                 except Exception as exc:
                     log.exception("Error on %s: %s", bot.symbol, exc)
+                    notify_error(f"{bot.symbol}: {exc}")
 
             info = mt5.account_info()
             if info:
@@ -882,6 +1207,16 @@ def main():
                         
                         log.info("Position %d closed at %.5f by %s - %s", ticket, close_price, close_reason.upper(), bot.symbol)
                         
+                        # Send close alert
+                        notify_close(
+                            closed.get("symbol", ""), closed.get("direction", ""),
+                            closed.get("session", ""), closed.get("entry", 0),
+                            close_price, actual_pnl or 0, close_reason, ticket
+                        )
+                        
+                        # Update risk management state
+                        _record_trade_result(close_reason, bot.symbol)
+                        
                         # Save to database as closed WITH actual P&L
                         _trades_db.close_trade(ticket, {
                             "close_reason": close_reason,
@@ -926,6 +1261,15 @@ def main():
                 }
 
             _save_state()
+            
+            # Daily P&L notification (once per day)
+            try:
+                info = mt5.account_info()
+                if info:
+                    _record_daily_notification(info.balance)
+            except Exception:
+                pass
+            
             time.sleep(POLL_INTERVAL)
 
     except KeyboardInterrupt:

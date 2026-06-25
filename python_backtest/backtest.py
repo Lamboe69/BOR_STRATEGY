@@ -79,18 +79,44 @@ def load_csv(path: str) -> list:
 
 def run_backtest(bars: list, symbol: str, initial_balance: float = 10_000.0):
     balance = initial_balance
+    fixed_risk_dollar = initial_balance * RISK_PCT / 100.0  # Fixed risk (matches live bot)
 
     def get_balance():
         return balance
+
+    # Per-symbol config (strip broker suffixes like 'm', '.m', '-M')
+    sym_base = symbol.upper()
+    for sfx in ('M', '.M', '-M'):
+        if sym_base.endswith(sfx):
+            sym_base = sym_base[:-len(sfx)]
+            break
+    sym_cfg = _cfg.get("symbols_config", {}).get(sym_base, {})
+    bt_tp_mult = float(sym_cfg.get("tp_multiplier", TP_MULTIPLIER))
+    bt_min_range = float(sym_cfg.get("min_range_points", float(_cfg.get("min_range_points", 0))))
+    bt_min_stop_points = int(sym_cfg.get("min_stop_points", 0))
+
+    # Infer point size for min_stop_distance (5-digit forex default)
+    _ps = {'XAU': 0.001, 'XAG': 0.001, 'US30': 0.01, 'USTEC': 0.01, 'NAS': 0.01, 'DOW': 0.01, 'JPY': 0.001}
+    bt_min_stop_dist = bt_min_stop_points * next((v for k, v in _ps.items() if k in symbol.upper()), 0.00001)
+
+    recfg = _cfg.get("retracement", {})
+    bt_retrace = bool(recfg.get("enabled", True))
+    bt_retrace_bars = int(recfg.get("max_wait_bars", 50))
+    bt_retrace_thresh = float(recfg.get("coverage_threshold", 0.0))
 
     strategy = BORStrategy(
         symbol=symbol,
         risk_pct=RISK_PCT,
         account_balance_fn=get_balance,
         max_trades=MAX_TRADES_PER_SESSION,
-        tp_mult=TP_MULTIPLIER,
+        tp_mult=bt_tp_mult,
         tokyo_start=TOKYO_START,   tokyo_end=TOKYO_END,
         london_start=LONDON_START, london_end=LONDON_END,
+        min_range_points=bt_min_range,
+        min_stop_distance=bt_min_stop_dist,
+        retrace_enabled=bt_retrace,
+        retrace_max_bars=bt_retrace_bars,
+        retrace_coverage_threshold=bt_retrace_thresh,
     )
 
     trades = []
@@ -108,120 +134,55 @@ def run_backtest(bars: list, symbol: str, initial_balance: float = 10_000.0):
         )
 
         for sig in signals:
-            risk_usd = balance * RISK_PCT / 100.0
-            sl_dist  = abs(sig["entry"] - sig["sl"])
-            
-            # Get signal details
+            risk_usd = fixed_risk_dollar
             entry = sig["entry"]
-            sl_original = sig["sl"]
+            sl = sig["sl"]
             tp = sig["tp"]
             direction = sig["direction"]
-            current_close = bar["close"]
-            signal_session = sig["session"]
-            
-            # Check if breakout candle has already covered > 15% of TP distance
-            total_tp_distance = abs(tp - entry)
-            if direction == "buy":
-                distance_covered = current_close - entry
-            else:
-                distance_covered = entry - current_close
-            
-            tp_coverage_pct = (distance_covered / total_tp_distance * 100) if total_tp_distance > 0 else 0
-            
+
             # Estimate typical spread for symbol
             sym_upper = symbol.upper()
             if any(x in sym_upper for x in ['XAU','GOLD']):
-                typical_spread = 0.50  # $0.50 for gold
+                typical_spread = 0.50
             elif any(x in sym_upper for x in ['US30','DJ','DOW']):
-                typical_spread = 3.0   # 3 points for Dow
+                typical_spread = 3.0
             elif any(x in sym_upper for x in ['NAS','USTEC','US100']):
-                typical_spread = 2.0   # 2 points for Nasdaq
+                typical_spread = 2.0
             elif any(x in sym_upper for x in ['GBP']):
-                typical_spread = 0.00015  # 1.5 pips for GBP pairs
+                typical_spread = 0.00015
             elif any(x in sym_upper for x in ['JPY']):
-                typical_spread = 0.015    # 1.5 pips for JPY pairs
-            else:  # EURUSD default
-                typical_spread = 0.00020  # 2 pips
-            
-            # Calculate ORIGINAL SL distance from entry
-            original_sl_distance = abs(entry - sl_original)
-            
-            # Only apply spread buffer if SL is dangerously tight (< 2× spread)
-            sl_adjusted = sl_original
+                typical_spread = 0.015
+            else:
+                typical_spread = 0.00020
+
+            original_sl_distance = abs(entry - sl)
+            sl_adjusted = sl
             if original_sl_distance < (typical_spread * 2):
                 spread_buffer = typical_spread * 1.5
                 if direction == "buy":
-                    sl_adjusted = sl_original - spread_buffer
+                    sl_adjusted = sl - spread_buffer
                 else:
-                    sl_adjusted = sl_original + spread_buffer
-            
-            # Decide: immediate entry or wait for retrace (15% threshold)
-            if tp_coverage_pct > 15:
-                # Breakout covered > 15% of TP → wait for retrace to entry level
-                entry_filled = False
-                order_cancelled = False
-                
-                for j in range(i+1, min(i+50, len(bars))):
-                    future_bar = bars[j]
-                    future_time = future_bar["time"]
-                    
-                    # Check session status
-                    future_tky_active = in_session(future_time, TOKYO_START, TOKYO_END)
-                    future_ldn_active = in_session(future_time, LONDON_START, LONDON_END)
-                    
-                    # Check if order should be cancelled
-                    if signal_session == "tokyo":
-                        if future_ldn_active or not future_tky_active:
-                            order_cancelled = True
-                            break
-                    elif signal_session == "london":
-                        if not future_ldn_active:
-                            order_cancelled = True
-                            break
-                    
-                    # Check if TP reached first
-                    if direction == "buy":
-                        if future_bar["high"] >= tp:
-                            order_cancelled = True
-                            break
-                        if future_bar["low"] <= entry:
-                            entry_filled = True
-                            entry_bar_idx = j
-                            break
-                    else:
-                        if future_bar["low"] <= tp:
-                            order_cancelled = True
-                            break
-                        if future_bar["high"] >= entry:
-                            entry_filled = True
-                            entry_bar_idx = j
-                            break
-                
-                if order_cancelled or not entry_filled:
-                    continue
-                
-                # Simulate trade from retrace entry point
-                outcome, _, _ = _simulate_trade(bars, entry_bar_idx, direction, tp, sl_adjusted)
-            else:
-                # Breakout covered ≤ 15% of TP → enter immediately
-                outcome, _, _ = _simulate_trade(bars, i, direction, tp, sl_adjusted)
+                    sl_adjusted = sl + spread_buffer
 
-            pnl = risk_usd * TP_MULTIPLIER if outcome == "tp" else -risk_usd
+            # Simulate trade from entry bar
+            outcome, _, _ = _simulate_trade(bars, i, direction, tp, sl_adjusted)
+
+            pnl = risk_usd * bt_tp_mult if outcome == "tp" else -risk_usd
             balance += pnl
 
             trades.append({
                 "time":      sig["time"].strftime("%Y-%m-%d %H:%M"),
                 "session":   sig["session"],
                 "direction": sig["direction"],
-                "entry":     round(sig["entry"], 5),
-                "sl":        round(sig["sl"],    5),
-                "tp":        round(sig["tp"],    5),
+                "entry":     round(entry, 5),
+                "sl":        round(sl,    5),
+                "tp":        round(tp,    5),
                 "outcome":   outcome,
                 "pnl":       round(pnl, 2),
                 "balance":   round(balance, 2),
                 "close_time": "",
-                "tp_coverage": round(tp_coverage_pct, 1),
-                "entry_type": "LIMIT" if tp_coverage_pct > 15 else "MARKET",
+                "tp_coverage": 0.0,
+                "entry_type": sig.get("entry_type", "MARKET"),
             })
 
     return trades, balance

@@ -7,7 +7,7 @@ Run:
     python ui/dashboard.py
 """
 
-import json, sys, subprocess, signal, webbrowser, threading, os, hashlib, secrets, datetime
+import json, sys, subprocess, signal, os, hashlib, secrets, datetime
 from pathlib import Path
 from flask import Flask, render_template, jsonify, request, redirect, url_for, session
 from functools import wraps
@@ -39,7 +39,15 @@ def _save_settings(data: dict):
     SETTINGS_FILE.write_text(json.dumps(data, indent=2))
 
 def _bot_running() -> bool:
-    return _bot_process is not None and _bot_process.poll() is None
+    if _bot_process is not None and _bot_process.poll() is None:
+        return True
+    # Also check if any live_bot process is running (started externally)
+    try:
+        import subprocess
+        r = subprocess.run(["pgrep", "-f", "live_bot.py"], capture_output=True, text=True, timeout=5)
+        return r.returncode == 0 and len(r.stdout.strip()) > 0
+    except Exception:
+        return False
 
 def _load_users() -> dict:
     try:
@@ -58,6 +66,14 @@ def login_required(f):
     def decorated(*args, **kwargs):
         if not session.get("logged_in"):
             return redirect(url_for("login_page"))
+        return f(*args, **kwargs)
+    return decorated
+
+def api_login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("logged_in"):
+            return jsonify({"ok": False, "msg": "Authentication required"}), 401
         return f(*args, **kwargs)
     return decorated
 
@@ -234,7 +250,7 @@ def _compute_active_sessions() -> dict:
 
 
 @app.route("/state")
-@login_required
+@api_login_required
 def state():
     running = _bot_running()
     try:
@@ -268,23 +284,158 @@ def state():
     if not s.get("server"):
         s["server"] = _load_settings().get("mt5_server", "")
 
+    # ── computed stats ──────────────────────────────────────────
+    import datetime as _dt_mod
+
+    cfg_settings = _load_settings()
+    initial_bal = float(cfg_settings.get("initial_balance", 10000))
+    risk_pct    = float(cfg_settings.get("risk_pct", 1.0))
+    s["initial_balance"] = initial_bal
+    s["risk_pct"] = risk_pct
+
+    today_str = _dt_mod.datetime.now(_dt_mod.timezone.utc).strftime("%Y-%m-%d")
+    hist = s.get("trade_history", [])
+    open_trds = s.get("open_trades", [])
+
+    # Daily stats
+    today_trades = [
+        t for t in hist
+        if t.get("closed_at", "").startswith(today_str)
+    ]
+    daily_wins   = sum(1 for t in today_trades if t.get("actual_pnl", 0) > 0)
+    daily_losses = sum(1 for t in today_trades if t.get("actual_pnl", 0) < 0)
+    daily_pnl    = sum(t.get("actual_pnl", 0) for t in today_trades)
+    s["daily_stats"] = {
+        "trades": len(today_trades),
+        "wins":   daily_wins,
+        "losses": daily_losses,
+        "win_rate": round(daily_wins / (daily_wins + daily_losses) * 100, 1)
+            if (daily_wins + daily_losses) > 0 else None,
+        "pnl": round(daily_pnl, 2),
+    }
+
+    # Symbol stats (all-time from trade history)
+    sym_stats = {}
+    for t in hist:
+        raw = t.get("symbol", "")
+        # strip broker suffix for cleaner display
+        clean = raw.rstrip("mM.-").upper()
+        if clean not in sym_stats:
+            sym_stats[clean] = {"wins": 0, "losses": 0, "pnl": 0}
+        pnl = t.get("actual_pnl", 0)
+        if pnl > 0:
+            sym_stats[clean]["wins"] += 1
+        elif pnl < 0:
+            sym_stats[clean]["losses"] += 1
+        sym_stats[clean]["pnl"] = round(sym_stats[clean]["pnl"] + pnl, 2)
+    s["symbol_stats"] = sym_stats
+
+    # Exposure — total $ at risk in open trades
+    exposure = 0.0
+    for t in open_trds:
+        entry = t.get("entry", 0)
+        sl    = t.get("sl", 0)
+        lot   = t.get("lot", 0)
+        dist  = abs(entry - sl)
+        # rough approximation: 1 pip = 0.0001 for 5-digit forex, 0.01 for XAU, 0.1 for indices
+        # using a per-symbol pip value would require symbol info, so use settings risk %
+        exposure += initial_bal * risk_pct / 100.0
+    s["exposure"] = round(exposure, 2)
+
+    # Running balance on each history trade
+    cumulative = initial_bal
+    for t in hist:
+        cumulative += t.get("actual_pnl", 0)
+        t["balance"] = round(cumulative, 2)
+
     return jsonify(s)
 
 
 @app.route("/performance")
-@login_required
+@api_login_required
 def performance():
-    """Return performance statistics and history for graphing"""
+    """Return performance statistics including trade stats, session breakdown, symbol summary"""
     try:
         sys.path.insert(0, str(ROOT))
-        from performance_tracker import get_stats
-        return jsonify(get_stats())
+        from performance_tracker import get_stats as get_curve_stats
+        from trades_db import TradesDB
+
+        result = get_curve_stats()
+
+        # Use settings initial_balance for consistency across pages
+        try:
+            cfg = _load_settings()
+            result["initial_balance"] = float(cfg.get("initial_balance", result["initial_balance"]))
+        except Exception:
+            pass
+
+        # Enrich with trade stats from database
+        trades_db = TradesDB(ROOT / "bor_trades.db.json")
+        all_closed = trades_db.get_closed_trades(limit=1000)
+        session_stats = trades_db.get_session_stats()
+
+        # Overall trade stats
+        total = len(all_closed)
+        wins  = sum(1 for t in all_closed if t.get("actual_pnl", 0) > 0)
+        loss  = sum(1 for t in all_closed if t.get("actual_pnl", 0) < 0)
+        pnl   = sum(t.get("actual_pnl", 0) for t in all_closed)
+
+        result["total_trades"] = total
+        result["wins"]   = wins
+        result["losses"] = loss
+        result["win_rate"] = round(wins / (wins + loss) * 100, 1) if (wins + loss) else 0
+
+        # Session breakdown
+        ses_summary = {}
+        for sym, ses_data in session_stats.items():
+            for ses_name, st in ses_data.items():
+                if ses_name not in ses_summary:
+                    ses_summary[ses_name] = {"wins": 0, "losses": 0, "trade_count": 0}
+                ses_summary[ses_name]["wins"] += st.get("wins", 0)
+                ses_summary[ses_name]["losses"] += st.get("losses", 0)
+                ses_summary[ses_name]["trade_count"] += st.get("trade_count", 0)
+        # Fill missing sessions
+        for sn in ("tokyo", "london"):
+            if sn not in ses_summary:
+                ses_summary[sn] = {"wins": 0, "losses": 0, "trade_count": 0}
+            sw = ses_summary[sn]["wins"]
+            sl = ses_summary[sn]["losses"]
+            ses_summary[sn]["win_rate"] = round(sw / (sw + sl) * 100, 1) if (sw + sl) else 0
+        result["session_summary"] = ses_summary
+
+        # Symbol summary table
+        sym_summary = {}
+        for t in all_closed:
+            raw = t.get("symbol", "")
+            clean = raw.rstrip("mM.-").upper()
+            if clean not in sym_summary:
+                sym_summary[clean] = {"wins": 0, "losses": 0, "pnl": 0, "trades": 0}
+            p = t.get("actual_pnl", 0)
+            if p > 0:
+                sym_summary[clean]["wins"] += 1
+            elif p < 0:
+                sym_summary[clean]["losses"] += 1
+            sym_summary[clean]["pnl"] = round(sym_summary[clean]["pnl"] + p, 2)
+            sym_summary[clean]["trades"] += 1
+        for _, v in sym_summary.items():
+            tot = v["wins"] + v["losses"]
+            v["win_rate"] = round(v["wins"] / tot * 100, 1) if tot else 0
+        result["symbol_summary"] = sym_summary
+
+        # Recent trade history (last 50)
+        recent = all_closed[-50:][::-1]  # newest first
+        for t in recent:
+            if "balance" not in t:
+                t.pop("balance", None)
+        result["recent_trades"] = recent
+
+        return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
 @app.route("/performance/symbol/<symbol>")
-@login_required
+@api_login_required
 def performance_symbol(symbol):
     """Return performance data for a specific symbol based on ACTUAL closed trade P&L from MT5"""
     try:
@@ -376,11 +527,129 @@ def bot_start():
     if _bot_running():
         return jsonify({"ok": True, "msg": "already running"})
     try:
-        _bot_process = subprocess.Popen(
-            [sys.executable, str(BOT_SCRIPT)],
-            cwd=str(ROOT)
+        # Use start_bot.sh wrapper which properly detaches with nohup
+        subprocess.run(
+            ["bash", str(ROOT / "start_bot.sh")],
+            cwd=str(ROOT), timeout=10
         )
-        return jsonify({"ok": True, "pid": _bot_process.pid})
+        # Re-read bot process PID
+        r = subprocess.run(["pgrep", "-f", "live_bot.py"], capture_output=True, text=True, timeout=5)
+        pid = int(r.stdout.strip().split()[0]) if r.returncode == 0 else None
+        # Mark state as running
+        try:
+            s = json.loads(STATE_FILE.read_text())
+            s["bot_running"] = True
+            STATE_FILE.write_text(json.dumps(s, indent=2))
+        except Exception:
+            pass
+        return jsonify({"ok": True, "pid": pid})
+    except Exception as e:
+        return jsonify({"ok": False, "msg": str(e)}), 500
+
+
+@app.route("/bot/config", methods=["GET", "POST"])
+@admin_required
+def bot_config():
+    """Get or update bot configuration."""
+    if request.method == "GET":
+        cfg = _load_settings()
+        return jsonify({"ok": True, "config": cfg})
+    try:
+        data = request.get_json(force=True)
+        if not data:
+            return jsonify({"ok": False, "msg": "No data provided"}), 400
+        # Validate and update
+        cfg = _load_settings()
+        for key in ("symbols", "risk_pct", "max_trades_per_session", "tp_multiplier",
+                     "poll_interval", "timezone_offset", "initial_balance",
+                     "min_range_points"):
+            if key in data:
+                cfg[key] = data[key]
+        if "sessions" in data:
+            cfg["sessions"] = data["sessions"]
+        if "risk_management" in data:
+            cfg["risk_management"] = data["risk_management"]
+        if "h1_trend_filter" in data:
+            cfg["h1_trend_filter"] = data["h1_trend_filter"]
+        if "telegram" in data:
+            cfg["telegram"] = data["telegram"]
+        if "symbols_config" in data:
+            cfg["symbols_config"] = data["symbols_config"]
+        if "retracement" in data:
+            cfg["retracement"] = data["retracement"]
+        SETTINGS_FILE.write_text(json.dumps(cfg))
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "msg": str(e)}), 500
+
+
+@app.route("/bot/webhook", methods=["POST"])
+@api_login_required
+def bot_webhook():
+    """Generic webhook endpoint for external integrations."""
+    data = request.get_json(force=True) if request.is_json else {}
+    action = data.get("action", "")
+    if action == "ping":
+        return jsonify({"ok": True, "msg": "pong"})
+    if action == "stop":
+        return bot_stop()
+    if action == "start":
+        return bot_start()
+    return jsonify({"ok": False, "msg": f"Unknown action: {action}"}), 400
+
+
+@app.route("/bot/daily")
+@api_login_required
+def bot_daily_stats():
+    """Return daily P&L breakdown."""
+    try:
+        import trades_db
+        db = trades_db.TradesDB(ROOT / "bor_trades.db.json")
+        closed = db.get_closed_trades()
+        days = {}
+        for t in closed:
+            day = t.get("closed_at", "")[:10]
+            if not day:
+                continue
+            if day not in days:
+                days[day] = {"date": day, "trades": 0, "wins": 0,
+                             "losses": 0, "pnl": 0.0}
+            days[day]["trades"] += 1
+            if t.get("close_reason") == "tp":
+                days[day]["wins"] += 1
+            elif t.get("close_reason") == "sl":
+                days[day]["losses"] += 1
+            days[day]["pnl"] += t.get("actual_pnl", 0)
+        result = sorted(days.values(), key=lambda x: x["date"])
+        return jsonify({"ok": True, "daily": result})
+    except Exception as e:
+        return jsonify({"ok": False, "msg": str(e)}), 500
+
+
+@app.route("/bot/telegram-test", methods=["POST"])
+@api_login_required
+def bot_telegram_test():
+    """Send a test Telegram message."""
+    try:
+        sys.path.insert(0, str(ROOT))
+        from python_mt5.alerts import send_telegram
+        ok = send_telegram("🧪 <b>BOR Bot Test</b>\nYour Telegram alert system is working!")
+        if ok:
+            return jsonify({"ok": True})
+        return jsonify({"ok": False, "msg": "Telegram not configured. Check settings."}), 400
+    except Exception as e:
+        return jsonify({"ok": False, "msg": str(e)}), 500
+
+
+@app.route("/state/risk")
+@api_login_required
+def state_risk():
+    """Return risk management state."""
+    try:
+        import trades_db
+        db = trades_db.TradesDB(ROOT / "bor_trades.db.json")
+        risk_stats = db.get_risk_stats()
+        return jsonify({"ok": True, "risk": risk_stats})
     except Exception as e:
         return jsonify({"ok": False, "msg": str(e)}), 500
 
@@ -391,15 +660,22 @@ def bot_stop():
     global _bot_process
     if not _bot_running():
         return jsonify({"ok": True, "msg": "not running"})
-    try:
-        _bot_process.terminate()
-        _bot_process.wait(timeout=5)
-    except Exception:
+    # Kill by _bot_process if tracked
+    if _bot_process is not None:
         try:
-            _bot_process.kill()
+            _bot_process.terminate()
+            _bot_process.wait(timeout=5)
         except Exception:
-            pass
-    _bot_process = None
+            try:
+                _bot_process.kill()
+            except Exception:
+                pass
+        _bot_process = None
+    # Also kill any live_bot.py process regardless of how it was started
+    try:
+        subprocess.run(["pkill", "-f", "live_bot.py"], timeout=5)
+    except Exception:
+        pass
     # mark state as disconnected
     try:
         s = json.loads(STATE_FILE.read_text())
@@ -418,7 +694,7 @@ def backtest_page():
 
 
 @app.route("/backtest/symbols")
-@login_required
+@api_login_required
 def backtest_symbols():
     """Return available symbols from MT5 if reachable, else fall back to settings."""
     cfg = _load_settings()
@@ -428,14 +704,10 @@ def backtest_symbols():
         login    = int(cfg.get("mt5_login", 0))
         password = cfg.get("mt5_password", "")
         server   = cfg.get("mt5_server", "")
-        path     = cfg.get("mt5_path", "") or None
         kwargs   = {"login": login, "password": password, "server": server}
-        if path:
-            kwargs["path"] = path
         if not mt5.initialize(**kwargs):
             return jsonify({"symbols": fallback, "source": "settings"})
         syms = mt5.symbols_get()
-        mt5.shutdown()
         if syms:
             names = sorted(s.name for s in syms)
             return jsonify({"symbols": names, "source": "mt5"})
@@ -445,18 +717,17 @@ def backtest_symbols():
 
 
 @app.route("/backtest/run", methods=["POST"])
-@login_required
+@api_login_required
 def backtest_run():
-    import datetime, random, csv as _csv
+    import datetime
     import pytz
     UTC = pytz.utc
 
     data      = request.get_json(force=True)
-    symbol    = data.get("symbol", "EURUSD").strip()  # Keep original case - broker symbols are case-sensitive
-    csv_m15   = data.get("csv_m15", "").strip()
+    symbol    = data.get("symbol", "EURUSD").strip()
     balance   = float(data.get("balance", 10000))
     risk_pct  = float(data.get("risk_pct", 1.0))
-    max_trades_override = data.get("max_trades")  # User-specified max trades
+    max_trades_override = data.get("max_trades")
     date_from = data.get("date_from", "").strip()
     date_to   = data.get("date_to",   "").strip()
 
@@ -465,7 +736,6 @@ def backtest_run():
     ses        = cfg.get("sessions", {})
     tky        = ses.get("tokyo",  {"start": "00:00", "end": "09:00"})
     ldn        = ses.get("london", {"start": "07:00", "end": "16:00"})
-    # Use user-specified max_trades if provided, otherwise use settings
     max_trades = int(max_trades_override) if max_trades_override is not None else int(cfg.get("max_trades_per_session", 2))
     tp_mult    = float(cfg.get("tp_multiplier", 10))
 
@@ -482,14 +752,12 @@ def backtest_run():
     ldn_s = _to_utc(_parse(ldn.get("start","07:00")), tz)
     ldn_e = _to_utc(_parse(ldn.get("end",  "16:00")), tz)
 
-    # parse date filter
     dt_from = dt_to = None
     try:
         if date_from:
             dt_from = datetime.datetime.strptime(date_from, "%Y-%m-%d").replace(tzinfo=UTC)
         if date_to:
             dt_to   = datetime.datetime.strptime(date_to,   "%Y-%m-%d").replace(tzinfo=UTC) + datetime.timedelta(days=1)
-        # Validate: from date must be before to date
         if dt_from and dt_to and dt_from >= dt_to:
             return jsonify({"ok": False, "msg": "Start date must be before end date"}), 400
     except ValueError as e:
@@ -497,116 +765,109 @@ def backtest_run():
     except Exception:
         pass
 
-    def _load_csv(path):
+    def _resolve_mt5_symbol(sym):
+        """Resolve broker symbol name (e.g. EURUSD -> EURUSDm for Exness)."""
+        import MetaTrader5 as mt5
+        info = mt5.symbol_info(sym)
+        if info is not None:
+            return sym
+        candidates = [sym + s for s in ('m', '.m', '-M', '') if sym + s != sym]
+        for c in candidates:
+            if mt5.symbol_info(c) is not None:
+                return c
+        return sym
+
+    def _load_mt5_chunk(resolved, from_dt, to_dt, timeframe_mt5):
+        """Fetch a single chunk of MT5 data."""
+        rates = mt5.copy_rates_range(resolved, timeframe_mt5, from_dt, to_dt)
+        if rates is None or len(rates) == 0:
+            return []
         bars = []
-        with open(path, newline="") as f:
-            for row in _csv.DictReader(f):
-                bars.append({
-                    "time":  datetime.datetime.strptime(row["time"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC),
-                    "open":  float(row["open"]),  "high": float(row["high"]),
-                    "low":   float(row["low"]),   "close": float(row["close"]),
-                })
+        for r in rates:
+            bars.append({
+                "time":  datetime.datetime.fromtimestamp(r["time"], tz=UTC),
+                "open":  float(r["open"]),
+                "high":  float(r["high"]),
+                "low":   float(r["low"]),
+                "close": float(r["close"]),
+            })
         return bars
 
-    def _load_mt5(sym, from_dt, to_dt, timeframe_mt5):
-        """Fetch real historical data from MT5."""
-        try:
-            import MetaTrader5 as mt5
-            cfg      = _load_settings()
-            login    = int(cfg.get("mt5_login", 0))
-            password = cfg.get("mt5_password", "")
-            server   = cfg.get("mt5_server", "")
-            path     = cfg.get("mt5_path", "") or None
-            kwargs   = {"login": login, "password": password, "server": server}
-            if path:
-                kwargs["path"] = path
-            
-            if not mt5.initialize(**kwargs):
-                error = mt5.last_error()
-                return None, f"MT5 initialization failed: {error}"
-            
-            # Check if symbol exists
-            symbol_info = mt5.symbol_info(sym)
-            if symbol_info is None:
-                # Get list of similar symbols to help user
-                all_symbols = mt5.symbols_get()
-                similar = []
-                if all_symbols:
-                    sym_base = sym.replace('M', '').replace('m', '')
-                    similar = [s.name for s in all_symbols if sym_base.lower() in s.name.lower()][:5]
-                mt5.shutdown()
-                
-                if similar:
-                    return None, f"Symbol '{sym}' not found. Did you mean: {', '.join(similar)}? Check the exact symbol name in your MT5 Market Watch."
-                else:
-                    return None, f"Symbol '{sym}' not found. Please check the exact symbol name in your MT5 Market Watch (case-sensitive)."
-            
-            # Enable symbol if not visible
-            if not symbol_info.visible:
-                if not mt5.symbol_select(sym, True):
-                    mt5.shutdown()
-                    return None, f"Failed to enable symbol '{sym}'"
-            
-            rates = mt5.copy_rates_range(sym, timeframe_mt5, from_dt, to_dt)
-            mt5.shutdown()
-            
-            if rates is None or len(rates) == 0:
-                return None, f"No historical data returned for '{sym}' in the date range {from_dt.strftime('%Y-%m-%d')} to {to_dt.strftime('%Y-%m-%d')}. The broker may not have data available for these dates yet."
-            
-            bars = []
-            for r in rates:
-                bars.append({
-                    "time":  datetime.datetime.fromtimestamp(r["time"], tz=UTC),
-                    "open":  float(r["open"]),
-                    "high":  float(r["high"]),
-                    "low":   float(r["low"]),
-                    "close": float(r["close"]),
-                })
-            return bars, None
-        except Exception as e:
-            return None, f"MT5 error: {str(e)}"
+    def _load_mt5_all(sym, from_dt, to_dt, timeframe_mt5, max_candles=80000):
+        """Fetch data, auto-chunking if requested range is too large."""
+        cfg      = _load_settings()
+        login    = int(cfg.get("mt5_login", 0))
+        password = cfg.get("mt5_password", "")
+        server   = cfg.get("mt5_server", "")
+        kwargs   = {"login": login, "password": password, "server": server}
 
-    def _filter(bars):
-        if dt_from: bars = [b for b in bars if b["time"] >= dt_from]
-        if dt_to:   bars = [b for b in bars if b["time"] <  dt_to]
-        return bars
+        if not mt5.initialize(**kwargs):
+            error = mt5.last_error()
+            return None, f"MT5 initialization failed: {error}"
 
-    # Load data: MT5 first, then CSV - NO SYNTHETIC FALLBACK
+        resolved = _resolve_mt5_symbol(sym)
+        info = mt5.symbol_info(resolved)
+        if info is None:
+            all_syms = mt5.symbols_get()
+            similar = []
+            if all_syms:
+                base = sym.replace('M', '').replace('m', '')
+                similar = [s.name for s in all_syms if base.lower() in s.name.lower()][:5]
+            if similar:
+                return None, f"Symbol '{sym}' not found. Did you mean: {', '.join(similar)}?"
+            return None, f"Symbol '{sym}' not found in MT5."
+
+        if not info.visible:
+            mt5.symbol_select(resolved, True)
+
+        total_days = (to_dt - from_dt).days
+        estimated_candles = total_days * 96  # M15 = 96 candles/day
+
+        if estimated_candles <= max_candles:
+            bars = _load_mt5_chunk(resolved, from_dt, to_dt, timeframe_mt5)
+            if not bars:
+                return None, f"No data for '{resolved}' in {from_dt.strftime('%Y-%m-%d')} to {to_dt.strftime('%Y-%m-%d')}."
+            return bars, resolved
+
+        # Split into yearly chunks
+        all_bars = []
+        chunk_start = from_dt
+        while chunk_start < to_dt:
+            chunk_end = min(chunk_start + datetime.timedelta(days=365), to_dt)
+            chunk_bars = _load_mt5_chunk(resolved, chunk_start, chunk_end, timeframe_mt5)
+            if chunk_bars:
+                all_bars.extend(chunk_bars)
+            chunk_start = chunk_end
+
+        if not all_bars:
+            return None, f"No data for '{resolved}' in {from_dt.strftime('%Y-%m-%d')} to {to_dt.strftime('%Y-%m-%d')}."
+
+        # Deduplicate by time
+        seen = set()
+        deduped = []
+        for b in all_bars:
+            t = b["time"].timestamp()
+            if t not in seen:
+                seen.add(t)
+                deduped.append(b)
+        deduped.sort(key=lambda b: b["time"])
+
+        return deduped, resolved
+
     bars_m15 = None
     data_source = None
-    error_msg = None
     _from = dt_from or (datetime.datetime.now(UTC) - datetime.timedelta(days=120))
     _to   = dt_to   or  datetime.datetime.now(UTC)
-    
-    # Try MT5 first
-    if not csv_m15:
-        try:
-            import MetaTrader5 as mt5
-            bars_m15, error_msg = _load_mt5(symbol, _from, _to, mt5.TIMEFRAME_M15)
-            if bars_m15 and len(bars_m15) > 0:
-                actual_from = bars_m15[0]["time"].strftime("%Y-%m-%d")
-                actual_to = bars_m15[-1]["time"].strftime("%Y-%m-%d")
-                data_source = f"MT5 real data ({actual_from} to {actual_to})"
-                error_msg = None
-        except Exception as e:
-            error_msg = f"Failed to load MT5: {str(e)}"
-    
-    # Try CSV if MT5 failed
-    if bars_m15 is None and csv_m15:
-        try:
-            bars_m15 = _filter(_load_csv(csv_m15))
-            if bars_m15:
-                data_source = "CSV data"
-                error_msg = None
-        except Exception as e:
-            error_msg = f"Failed to load CSV: {str(e)}"
-    
-    # Reject if no real data available
-    if bars_m15 is None or len(bars_m15) == 0:
-        return jsonify({
-            "ok": False, 
-            "msg": error_msg or f"No historical data available for {symbol} in the selected date range. Please check: 1) MT5 connection, 2) Symbol name matches your broker, 3) Date range has data available."
-        }), 400
+
+    import MetaTrader5 as mt5
+    bars_m15, err_or_sym = _load_mt5_all(symbol, _from, _to, mt5.TIMEFRAME_M15)
+    if bars_m15 is not None and len(bars_m15) > 0:
+        resolved_sym = err_or_sym
+        actual_from = bars_m15[0]["time"].strftime("%Y-%m-%d")
+        actual_to = bars_m15[-1]["time"].strftime("%Y-%m-%d")
+        data_source = f"MT5 real data for {resolved_sym} ({actual_from} to {actual_to})"
+    else:
+        return jsonify({"ok": False, "msg": err_or_sym}), 400
 
     try:
         sys.path.insert(0, str(ROOT))
@@ -621,6 +882,25 @@ def backtest_run():
         bal = balance
         def get_bal(): return bal
 
+        # Per-symbol config (strip broker suffixes like 'm', '.m', '-M')
+        sym_base = symbol.upper()
+        for sfx in ('M', '.M', '-M'):
+            if sym_base.endswith(sfx):
+                sym_base = sym_base[:-len(sfx)]
+                break
+        sym_cfg = cfg.get("symbols_config", {}).get(sym_base, {})
+        bt_tp_mult = float(sym_cfg.get("tp_multiplier", tp_mult))
+        bt_min_range = float(sym_cfg.get("min_range_points", float(cfg.get("min_range_points", 0))))
+        bt_min_stop_points = int(sym_cfg.get("min_stop_points", 0))
+        # Infer point size for min_stop_distance
+        _ps = {'XAU': 0.001, 'XAG': 0.001, 'US30': 0.01, 'USTEC': 0.01, 'NAS': 0.01, 'DOW': 0.01, 'JPY': 0.001}
+        bt_min_stop_dist = bt_min_stop_points * next((v for k, v in _ps.items() if k in symbol.upper()), 0.00001)
+
+        recfg = cfg.get("retracement", {})
+        bt_retrace = bool(recfg.get("enabled", True))
+        bt_retrace_bars = int(recfg.get("max_wait_bars", 50))
+        bt_retrace_thresh = float(recfg.get("coverage_threshold", 0.0))
+
         # Per-symbol session tracking
         symbol_session_stats = {
             "tokyo": {"wins": 0, "losses": 0, "trade_count": 0},
@@ -629,9 +909,14 @@ def backtest_run():
 
         strategy = BORStrategy(
             symbol=symbol, risk_pct=risk_pct, account_balance_fn=get_bal,
-            max_trades=max_trades, tp_mult=tp_mult,
+            max_trades=max_trades, tp_mult=bt_tp_mult,
             tokyo_start=tky_s, tokyo_end=tky_e,
             london_start=ldn_s, london_end=ldn_e,
+            min_range_points=bt_min_range,
+            min_stop_distance=bt_min_stop_dist,
+            retrace_enabled=bt_retrace,
+            retrace_max_bars=bt_retrace_bars,
+            retrace_coverage_threshold=bt_retrace_thresh,
         )
 
         trades = []
@@ -648,137 +933,43 @@ def backtest_run():
             )
 
             for sig in sigs:
-                # Simulate spread buffer logic (same as live bot)
                 entry = sig["entry"]
-                sl_original = sig["sl"]
+                sl = sig["sl"]
                 tp = sig["tp"]
                 direction = sig["direction"]
-                current_close = bar["close"]
-                signal_session = sig["session"]
                 
-                # Check if breakout candle has already covered > 15% of TP distance
-                total_tp_distance = abs(tp - entry)
-                if direction == "buy":
-                    distance_covered = current_close - entry
-                else:
-                    distance_covered = entry - current_close
-                
-                tp_coverage_pct = (distance_covered / total_tp_distance * 100) if total_tp_distance > 0 else 0
-                
+
                 # Estimate typical spread for symbol
                 sym_upper = symbol.upper()
                 if any(x in sym_upper for x in ['XAU','GOLD']):
-                    typical_spread = 0.50  # $0.50 for gold
+                    typical_spread = 0.50
                 elif any(x in sym_upper for x in ['US30','DJ','DOW']):
-                    typical_spread = 3.0   # 3 points for Dow
+                    typical_spread = 3.0
                 elif any(x in sym_upper for x in ['NAS','USTEC','US100']):
-                    typical_spread = 2.0   # 2 points for Nasdaq
+                    typical_spread = 2.0
                 elif any(x in sym_upper for x in ['GBP']):
-                    typical_spread = 0.00015  # 1.5 pips for GBP pairs
+                    typical_spread = 0.00015
                 elif any(x in sym_upper for x in ['JPY']):
-                    typical_spread = 0.015    # 1.5 pips for JPY pairs
-                else:  # EURUSD default
-                    typical_spread = 0.00020  # 2 pips
+                    typical_spread = 0.015
+                else:
+                    typical_spread = 0.00020
                 
-                # Calculate ORIGINAL SL distance from entry
-                original_sl_distance = abs(entry - sl_original)
-                
-                # Only apply spread buffer if SL is dangerously tight (< 2× spread)
-                sl_adjusted = sl_original
+                original_sl_distance = abs(entry - sl)
+                sl_adjusted = sl
                 if original_sl_distance < (typical_spread * 2):
                     spread_buffer = typical_spread * 1.5
                     if direction == "buy":
-                        sl_adjusted = sl_original - spread_buffer
+                        sl_adjusted = sl - spread_buffer
                     else:
-                        sl_adjusted = sl_original + spread_buffer
+                        sl_adjusted = sl + spread_buffer
                 
-                # Decide: immediate entry or wait for retrace (15% threshold)
-                if tp_coverage_pct > 15:
-                    # Breakout covered > 15% of TP → wait for retrace to entry level
-                    # BUT cancel if:
-                    # 1. Price reaches TP first
-                    # 2. Tokyo order: London starts OR Tokyo ends
-                    # 3. London order: London ends
-                    entry_filled = False
-                    order_cancelled = False
-                    cancel_reason = ""
-                    
-                    def _check_session(dt_obj, start_tuple, end_tuple):
-                        """Helper to check if time is in session."""
-                        t = dt_obj.hour * 60 + dt_obj.minute
-                        s = start_tuple[0] * 60 + start_tuple[1]
-                        e = end_tuple[0] * 60 + end_tuple[1]
-                        if s < e:
-                            return s <= t < e
-                        return t >= s or t < e
-                    
-                    for j in range(i+1, min(i+50, len(bars))):  # check next 50 bars
-                        future_bar = bars[j]
-                        future_time = future_bar["time"]
-                        
-                        # Check session status at this future time
-                        future_tky_active = _check_session(future_time, tky_s, tky_e)
-                        future_ldn_active = _check_session(future_time, ldn_s, ldn_e)
-                        
-                        # Check if order should be cancelled due to session end
-                        if signal_session == "tokyo":
-                            # Tokyo orders: cancel if London starts OR Tokyo ends
-                            if future_ldn_active:
-                                order_cancelled = True
-                                cancel_reason = "London session started"
-                                break
-                            elif not future_tky_active:
-                                order_cancelled = True
-                                cancel_reason = "Tokyo session ended"
-                                break
-                        elif signal_session == "london":
-                            # London orders: cancel if London ends
-                            if not future_ldn_active:
-                                order_cancelled = True
-                                cancel_reason = "London session ended"
-                                break
-                        
-                        # Check if TP reached first
-                        if direction == "buy":
-                            if future_bar["high"] >= tp:
-                                order_cancelled = True
-                                cancel_reason = "price reached TP"
-                                break
-                            # Check if price retraced to entry
-                            if future_bar["low"] <= entry:
-                                entry_filled = True
-                                entry_bar_idx = j
-                                break
-                        else:
-                            if future_bar["low"] <= tp:
-                                order_cancelled = True
-                                cancel_reason = "price reached TP"
-                                break
-                            # Check if price retraced to entry
-                            if future_bar["high"] >= entry:
-                                entry_filled = True
-                                entry_bar_idx = j
-                                break
-                    
-                    if order_cancelled:
-                        # Order cancelled → skip trade
-                        continue
-                    
-                    if not entry_filled:
-                        # Price never retraced and order not cancelled → expired, skip trade
-                        continue
-                    
-                    # Simulate trade from retrace entry point
-                    outcome, _, _ = _sim_trade(bars, entry_bar_idx, direction, tp, sl_adjusted)
-                else:
-                    # Breakout covered ≤ 15% of TP → enter immediately
-                    outcome, _, _ = _sim_trade(bars, i, direction, tp, sl_adjusted)
+                # Simulate trade from entry bar
+                outcome, _, _ = _sim_trade(bars, i, direction, tp, sl_adjusted)
                 
                 risk_usd = balance * risk_pct / 100.0
-                pnl = risk_usd * tp_mult if outcome == "tp" else -risk_usd
+                pnl = risk_usd * bt_tp_mult if outcome == "tp" else -risk_usd
                 bal += pnl
                 
-                # Update per-symbol session stats
                 session_name = sig["session"]
                 if outcome == "tp":
                     symbol_session_stats[session_name]["wins"] += 1
@@ -791,13 +982,13 @@ def backtest_run():
                     "session":   session_name,
                     "direction": direction,
                     "entry":     round(entry, 5),
-                    "sl":        round(sl_adjusted, 5),
+                    "sl":        round(sl, 5),
                     "tp":        round(tp, 5),
                     "outcome":   outcome,
                     "pnl":       round(pnl, 2),
                     "balance":   round(bal, 2),
-                    "tp_coverage": round(tp_coverage_pct, 1),
-                    "entry_type": "LIMIT" if tp_coverage_pct > 15 else "MARKET",
+                    "tp_coverage": 0.0,
+                    "entry_type": sig.get("entry_type", "MARKET"),
                 })
 
         wins   = sum(1 for t in trades if t["outcome"] == "tp")
@@ -821,6 +1012,17 @@ def backtest_run():
         if bars:
             date_range = f"{bars[0]['time'].strftime('%Y-%m-%d')} → {bars[-1]['time'].strftime('%Y-%m-%d')}"
 
+        # Compute derived metrics
+        win_trades  = [t for t in trades if t["outcome"] == "tp"]
+        loss_trades = [t for t in trades if t["outcome"] == "sl"]
+        avg_win     = round(sum(t["pnl"] for t in win_trades) / len(win_trades), 2) if win_trades else 0
+        avg_loss    = round(sum(t["pnl"] for t in loss_trades) / len(loss_trades), 2) if loss_trades else 0
+        largest_win = round(max(t["pnl"] for t in win_trades), 2) if win_trades else 0
+        largest_loss = round(min(t["pnl"] for t in loss_trades), 2) if loss_trades else 0
+
+        # Equity curve data points (balance after each trade)
+        eq_curve = [{"time": t["time"], "balance": t["balance"]} for t in trades]
+
         result = {
             "symbol":      symbol,
             "data_source": data_source,
@@ -834,10 +1036,23 @@ def backtest_run():
             "wins":        wins,
             "losses":      losses,
             "win_rate":    round(wins/total*100, 1) if total else 0,
+            "avg_win":     avg_win,
+            "avg_loss":    avg_loss,
+            "largest_win": largest_win,
+            "largest_loss": largest_loss,
+            "avg_rr":      round(avg_win / abs(avg_loss), 2) if avg_loss else 0,
+            "eq_curve":    eq_curve,
             "sessions":    sessions_result,
             "trades":      trades[-50:],
             "actual":      actual,
-            "run_at":      datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC"),
+            "run_at":      datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+            "config": {
+                "tp_multiplier": bt_tp_mult,
+                "min_range_points": bt_min_range,
+                "retrace_enabled": bt_retrace,
+                "retrace_max_bars": bt_retrace_bars,
+                "retrace_coverage_threshold": bt_retrace_thresh,
+            },
         }
 
         try:
@@ -871,7 +1086,7 @@ def _actual_win_rate(symbol: str) -> dict:
     try:
         s = json.loads(STATE_FILE.read_text())
         hist = [t for t in s.get("trade_history", []) if t.get("symbol") == symbol]
-        wins   = sum(1 for t in hist if t.get("close_reason") == "closed")
+        wins   = sum(1 for t in hist if t.get("close_reason") == "tp")
         losses = sum(1 for t in hist if t.get("close_reason") == "sl")
         total  = wins + losses
         return {"wins": wins, "losses": losses, "total": total,
@@ -881,7 +1096,7 @@ def _actual_win_rate(symbol: str) -> dict:
 
 
 @app.route("/backtest/results")
-@login_required
+@api_login_required
 def backtest_results():
     try:
         return jsonify(json.loads(BACKTEST_FILE.read_text()) if BACKTEST_FILE.exists() else {})
@@ -891,9 +1106,5 @@ def backtest_results():
 
 # ── launch ────────────────────────────────────────────────────────────────────
 
-def _open_browser():
-    webbrowser.open("http://localhost:5000")
-
 if __name__ == "__main__":
-    threading.Timer(1.0, _open_browser).start()
     app.run(debug=False, port=5000)

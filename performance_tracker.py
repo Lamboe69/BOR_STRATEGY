@@ -57,6 +57,11 @@ def save_snapshot(balance: float, equity: float):
     except Exception:
         pass
 
+def get_equity_curve() -> list:
+    """Return the raw equity curve history for charting."""
+    data = load_history()
+    return data.get("history", [])
+
 def get_stats():
     """Calculate performance statistics"""
     data = load_history()

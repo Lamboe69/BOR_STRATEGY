@@ -124,6 +124,44 @@
   text-shadow: 0 0 20px rgba(248, 113, 113, 0.6); 
 }
 
+/* ── DAILY STATS STRIP ── */
+.daily-strip {
+  display: flex;
+  gap: 28px;
+  z-index: 2;
+  margin: 4px 0 28px;
+  padding: 16px 24px;
+  background: var(--bg3);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.35);
+}
+
+.ds-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ds-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--fg2);
+  text-transform: uppercase;
+  letter-spacing: 0.9px;
+}
+
+.ds-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--fg);
+}
+
+.ds-val.green { color: var(--green); text-shadow: 0 0 16px rgba(52, 211, 153, 0.5); }
+.ds-val.red   { color: var(--red);   text-shadow: 0 0 16px rgba(248, 113, 113, 0.5); }
+
 /* ── SESSIONS SECTION ── */
 .sessions {
   display: grid;
@@ -264,6 +302,60 @@
   50% { opacity: 0.5; transform: scale(0.85); }
 }
 
+/* ── LEVELS MINI TABLE ── */
+.lvl-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 0;
+}
+
+.lvl-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  padding: 4px 6px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 6px;
+}
+
+.lvl-sym {
+  font-weight: 700;
+  color: var(--fg);
+  min-width: 60px;
+}
+
+.lvl-l {
+  color: var(--fg2);
+  font-size: 9px;
+}
+
+.lvl-v {
+  color: var(--fg4);
+  min-width: 60px;
+  text-align: right;
+}
+
+/* ── SYMBOL WR CHIP ── */
+.sym-wr {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  margin-left: 6px;
+}
+
+.sym-wr.pos { background: rgba(52, 211, 153, 0.15); color: var(--green); border: 1px solid rgba(52, 211, 153, 0.3); }
+.sym-wr.neg { background: rgba(248, 113, 113, 0.15); color: var(--red);   border: 1px solid rgba(248, 113, 113, 0.3); }
+.sym-wr.neu { background: rgba(255, 255, 255, 0.06); color: var(--fg3);  border: 1px solid rgba(255, 255, 255, 0.08); }
+
 /* ── TABLES & PANELS ── */
 .panel, .log-panel {
   background: var(--bg3);
@@ -383,6 +475,12 @@ tr:hover td {
     grid-template-columns: repeat(3, 1fr); 
     gap: 16px;
   }
+  .daily-strip {
+    flex-wrap: wrap;
+    gap: 14px;
+    padding: 14px 18px;
+  }
+  .ds-val { font-size: 16px; }
   .sessions { 
     grid-template-columns: 1fr; 
     gap: 16px;
@@ -436,6 +534,17 @@ tr:hover td {
   }
   
   /* Sessions */
+  .daily-strip {
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 12px 14px;
+  }
+  .ds-label { font-size: 8.5px; }
+  .ds-val { font-size: 15px; }
+  .lvl-row { font-size: 9px; }
+  .lvl-sym { min-width: 50px; }
+  .lvl-v { min-width: 50px; }
+  .sym-wr { font-size: 8px; padding: 1px 6px; }
   .sessions {
     gap: 14px;
   }
@@ -537,6 +646,14 @@ tr:hover td {
   .sessions {
     gap: 12px;
   }
+  .daily-strip {
+    gap: 10px;
+    padding: 10px 12px;
+  }
+  .ds-val { font-size: 14px; }
+  .lvl-row { font-size: 8.5px; flex-wrap: wrap; gap: 2px 6px; }
+  .lvl-sym { min-width: 44px; }
+  .lvl-v { min-width: 44px; }
   .ses-card, .next-card { 
     padding: 16px 14px; 
   }
@@ -633,6 +750,16 @@ tr:hover td {
     font-size: 12px; 
   }
   
+  .daily-strip {
+    gap: 8px;
+    padding: 8px 10px;
+  }
+  .ds-label { font-size: 7.5px; }
+  .ds-val { font-size: 13px; }
+  .lvl-row { font-size: 8px; }
+  .lvl-sym { min-width: 40px; }
+  .lvl-v { min-width: 40px; }
+  .sym-wr { font-size: 7px; padding: 1px 4px; }
   .ses-card, .next-card { 
     padding: 14px 12px; 
   }
@@ -679,6 +806,26 @@ tr:hover td {
     </div>
   </div>
 
+  <!-- DAILY STATS STRIP -->
+  <div class="daily-strip">
+    <div class="ds-item">
+      <span class="ds-label">Today's P&amp;L</span>
+      <span class="ds-val" id="ds-pnl">—</span>
+    </div>
+    <div class="ds-item">
+      <span class="ds-label">Today's WR</span>
+      <span class="ds-val" id="ds-wr">—</span>
+    </div>
+    <div class="ds-item">
+      <span class="ds-label">Today's Trades</span>
+      <span class="ds-val" id="ds-trades">—</span>
+    </div>
+    <div class="ds-item">
+      <span class="ds-label">Exposure</span>
+      <span class="ds-val" id="ds-exposure">—</span>
+    </div>
+  </div>
+
   <!-- SESSIONS -->
   <div class="sessions">
     <div class="ses-card">
@@ -692,9 +839,7 @@ tr:hover td {
           </span>
         </div>
         <div class="ses-stats">
-          <span class="sk" title="Total trades opened in this session across all pairs">Trades</span><span class="sv" id="tky-trades">0</span>
-          <span class="sk" title="Wins / Losses (closed trades only)">W / L</span><span class="sv" id="tky-wl">0 / 0</span>
-          <span class="sk" title="BOR levels (S1=highest, S4=lowest)">Levels</span><span class="sv" id="tky-levels" style="font-size:10px;line-height:1.6;">—</span>
+          <span class="sk" title="BOR levels (S1=highest, S4=lowest)">Levels</span><div class="lvl-grid" id="tky-levels"><span class="sv" style="font-size:10px;">—</span></div>
         </div>
       </div>
     </div>
@@ -710,9 +855,7 @@ tr:hover td {
           </span>
         </div>
         <div class="ses-stats">
-          <span class="sk" title="Total trades opened in this session across all pairs">Trades</span><span class="sv" id="ldn-trades">0</span>
-          <span class="sk" title="Wins / Losses (closed trades only)">W / L</span><span class="sv" id="ldn-wl">0 / 0</span>
-          <span class="sk" title="BOR levels (S1=highest, S4=lowest)">Levels</span><span class="sv" id="ldn-levels" style="font-size:10px;line-height:1.6;">—</span>
+          <span class="sk" title="BOR levels (S1=highest, S4=lowest)">Levels</span><div class="lvl-grid" id="ldn-levels"><span class="sv" style="font-size:10px;">—</span></div>
         </div>
       </div>
     </div>
@@ -727,7 +870,7 @@ tr:hover td {
 
 
   <!-- TABLES -->
-  <div class="tables" style="display: grid; grid-template-columns: 1fr 1fr; gap: 28px; z-index: 2; margin-top: 12px; margin-bottom: 40px;">
+  <div class="tables" style="display: grid; grid-template-columns: 1fr; gap: 28px; z-index: 2; margin-top: 12px; margin-bottom: 40px;">
     <div class="panel" style="margin-bottom: 0;">
       <div class="panel-head">
         <div class="panel-title">
@@ -741,38 +884,16 @@ tr:hover td {
           <thead>
             <tr>
               <th>Symbol</th><th>Dir</th><th>Session</th>
-              <th>Entry</th><th>Current</th><th>SL</th><th>TP</th><th>Lot</th><th>P&L</th><th>Time</th>
+              <th>Entry</th><th>Current</th><th>SL</th><th>TP</th><th>Lot</th><th>P&amp;L</th><th>Duration</th><th>Time</th>
             </tr>
           </thead>
           <tbody id="open-tbody">
-            <tr class="t-empty"><td colspan="10">No open trades</td></tr>
+<tr class="t-empty"><td colspan="11">No open trades</td></tr>
           </tbody>
         </table>
       </div>
     </div>
 
-    <div class="panel" style="margin-bottom: 0;">
-      <div class="panel-head">
-        <div class="panel-title">
-          <div class="panel-title-bar" style="background:linear-gradient(180deg,var(--green),var(--cyan))"></div>
-          Trade History
-        </div>
-        <span class="cnt" id="hist-count" style="font-size:10px; font-weight:700; padding:4px 12px; border-radius:999px; background:rgba(255,255,255,0.08); color:var(--fg2);">0</span>
-      </div>
-      <div class="tbl-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Symbol</th><th>Dir</th><th>Session</th>
-              <th>Entry</th><th>SL</th><th>TP</th><th>Result</th><th>Time</th>
-            </tr>
-          </thead>
-          <tbody id="hist-tbody">
-            <tr class="t-empty"><td colspan="8">No history yet</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
   </div>
 
   <!-- LOG -->
@@ -822,6 +943,7 @@ const fmtMoney = v => (v>=0?'+$':'-$') + Math.abs(v).toFixed(2);
 
 // Track previous prices for animation
 let _prevPrices = {};
+let _firstLoad = true;
 
 function setSes(pfx, active) {
   const badge = $(pfx+'-badge');
@@ -842,7 +964,9 @@ function setSes(pfx, active) {
 async function refresh() {
   let s;
   try { 
-    s = await fetch('/state').then(r => r.json()); 
+    const r = await fetch('/state');
+    if (r.status === 401) { window.location.href = '/login'; return; }
+    s = await r.json(); 
   } catch(e) { 
     console.log("Failed to fetch state");
     return; 
@@ -858,35 +982,68 @@ async function refresh() {
   $('c-account').textContent = s.account || '—';
   $('c-balance').textContent = s.balance != null 
     ? '$' + s.balance.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
+  flashEl($('c-balance'));
   
   const eq = s.equity, bal = s.balance;
   $('c-equity').textContent = eq != null 
     ? '$' + eq.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
   $('c-equity').className = 'kpi-val' + (eq != null ? (eq >= bal ? ' green' : ' red') : '');
+  flashEl($('c-equity'));
 
   $('c-server').textContent = s.server || '—';
   $('c-update').textContent = s.last_update || '—';
+
+  // Daily stats
+  const ds = s.daily_stats || {};
+  const pnlEl = $('ds-pnl');
+  const pnl = ds.pnl;
+  pnlEl.textContent = pnl != null ? '$' + pnl.toFixed(2) : '—';
+  pnlEl.className = 'ds-val' + (pnl != null ? (pnl >= 0 ? ' green' : ' red') : '');
+
+  $('ds-wr').textContent = ds.win_rate != null ? ds.win_rate + '%' : '—';
+  $('ds-trades').textContent = ds.trades ?? '—';
+  flashEl($('ds-trades'));
+
+  const expEl = $('ds-exposure');
+  const exp = s.exposure;
+  expEl.textContent = exp != null ? '$' + exp.toFixed(2) : '—';
+  expEl.className = 'ds-val' + (exp > 0 ? ' red' : '');
+
+  // Symbol stats lookup for WR chips
+  const symStats = s.symbol_stats || {};
 
   const ses = s.sessions || {};
   for (const [key, pfx] of [['tokyo','tky'],['london','ldn']]) {
     const d = ses[key] || {};
     setSes(pfx, d.active);
-    $(pfx+'-trades').textContent = d.trades ?? 0;
-    $(pfx+'-wl').textContent = (d.wins??0)+' / '+(d.losses??0);
-    // Display levels with line breaks for multiple symbols
+    // Render levels as mini table per symbol
     const levelsEl = $(pfx+'-levels');
     if (d.levels && d.levels !== '—') {
-      levelsEl.innerHTML = d.levels.split('\n').join('<br>');
-      levelsEl.style.fontSize = '10px';
-      levelsEl.style.lineHeight = '1.6';
+      const lines = d.levels.split('\n');
+      let html = '';
+      for (const line of lines) {
+        const m = line.match(/^(\S+):\s*S1:([\d.]+)\s+S2:([\d.]+)\s+S3:([\d.]+)\s+S4:([\d.]+)/);
+        if (m) {
+          const sym = m[1], s1 = m[2], s2 = m[3], s3 = m[4], s4 = m[5];
+          html += '<div class="lvl-row">'
+            + '<span class="lvl-sym">' + sym.replace(/[mM.\-]+$/, '') + '</span>'
+            + '<span class="lvl-l">S1</span><span class="lvl-v">' + s1 + '</span>'
+            + '<span class="lvl-l">S2</span><span class="lvl-v">' + s2 + '</span>'
+            + '<span class="lvl-l">S3</span><span class="lvl-v">' + s3 + '</span>'
+            + '<span class="lvl-l">S4</span><span class="lvl-v">' + s4 + '</span>'
+            + '</div>';
+        }
+      }
+      levelsEl.innerHTML = html || '<span class="sv" style="font-size:10px;">—</span>';
     } else {
-      levelsEl.textContent = '—';
+      levelsEl.innerHTML = '<span class="sv" style="font-size:10px;">—</span>';
     }
   }
 
   // Open Trades with live price tracking
   const open = s.open_trades || [];
   $('open-count').textContent = open.length;
+  flashEl($('open-count'));
   
   // Debug: Log exact data being displayed
   if (open.length > 0) {
@@ -900,8 +1057,24 @@ async function refresh() {
     })));
   }
   
+  // Compute duration helper
+  function durationSince(timeStr) {
+    if (!timeStr) return '—';
+    const parts = timeStr.match(/(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})/);
+    if (!parts) return '—';
+    const then = new Date(parts[1] + 'T' + parts[2] + ':00Z');
+    const now = new Date();
+    const diff = Math.floor((now - then) / 1000);
+    if (diff < 0) return '—';
+    const h = Math.floor(diff / 3600);
+    const m = Math.floor((diff % 3600) / 60);
+    const s = diff % 60;
+    const p = v => String(v).padStart(2, '0');
+    return `${p(h)}:${p(m)}:${p(s)}`;
+  }
+
   $('open-tbody').innerHTML = open.length === 0 
-    ? '<tr class="t-empty"><td colspan="10">No open trades</td></tr>'
+    ? '<tr class="t-empty"><td colspan="11">No open trades</td></tr>'
     : open.map((t, idx) => {
         const pnl = t.pnl || 0;
         const current = t.current_price || 0;
@@ -917,8 +1090,17 @@ async function refresh() {
         
         const priceClass = priceChanged ? 'price-updated' : '';
         
+        // Per-symbol WR chip
+        const cleanSym = (t.symbol || '').replace(/[mM.\-]+$/, '').toUpperCase();
+        const st = symStats[cleanSym] || {};
+        const swr = (st.wins + st.losses) > 0 
+          ? Math.round(st.wins / (st.wins + st.losses) * 100) : null;
+        const wrClass = swr !== null ? (swr >= 50 ? 'pos' : swr > 0 ? 'neg' : 'neu') : 'neu';
+        const wrChip = swr !== null 
+          ? `<span class="sym-wr ${wrClass}">${swr}%</span>` : '';
+        
         return `<tr>
-          <td class="t-sym">${t.symbol}</td>
+          <td class="t-sym">${t.symbol}${wrChip}</td>
           <td class="${t.direction==='buy'?'t-buy':'t-sell'}">${t.direction.toUpperCase()}</td>
           <td>${t.session}</td>
           <td>${fmt(entry)}</td>
@@ -927,41 +1109,7 @@ async function refresh() {
           <td>${fmt(t.tp)}</td>
           <td>${t.lot.toFixed(2)}</td>
           <td class="${pnl>=0?'t-pos':'t-neg'} ${priceClass}" style="font-weight:700;">${fmtMoney(pnl)}</td>
-          <td>${t.time}</td>
-        </tr>`;
-      }).join('');
-
-  // Trade History
-  const hist = (s.trade_history || []).slice().reverse();
-  $('hist-count').textContent = hist.length;
-  $('hist-tbody').innerHTML = hist.length === 0 
-    ? '<tr class="t-empty"><td colspan="8">No history yet</td></tr>'
-    : hist.map(t => {
-        const reason = t.close_reason || 'closed';
-        const isTP = reason === 'tp';
-        const isSL = reason === 'sl';
-        let resultText = '';
-        let resultClass = '';
-        
-        if (isTP) {
-          resultText = '✓ TP';
-          resultClass = 't-win';
-        } else if (isSL) {
-          resultText = '✗ SL';
-          resultClass = 't-loss';
-        } else {
-          resultText = '◆ CLOSED';
-          resultClass = 't-neutral';
-        }
-        
-        return `<tr>
-          <td class="t-sym">${t.symbol}</td>
-          <td class="${t.direction==='buy'?'t-buy':'t-sell'}">${t.direction.toUpperCase()}</td>
-          <td>${t.session}</td>
-          <td>${fmt(t.entry)}</td>
-          <td>${fmt(t.sl)}</td>
-          <td>${fmt(t.tp)}</td>
-          <td class="${resultClass}">${resultText}</td>
+          <td style="font-size:11px;color:var(--fg2);">${durationSince(t.time)}</td>
           <td>${t.time}</td>
         </tr>`;
       }).join('');
@@ -976,12 +1124,34 @@ async function refresh() {
     return `<div class="${cls}">${line}</div>`;
   }).join('');
 
-  if ($('autoscroll').checked) {
-    logBox.scrollTop = logBox.scrollHeight;
-  }
+   if ($('autoscroll').checked) {
+     logBox.scrollTop = logBox.scrollHeight;
+   }
+}
+
+// Also fetch risk state
+async function refreshRisk() {
+  try {
+    const r = await fetch('/state/risk');
+    const j = await r.json();
+    if (j.ok && j.risk) {
+      // risk stats displayed via next refresh cycle
+    }
+  } catch (e) {}
 }
 
 setInterval(refresh, 1000);  // Update every 1 second for live price tracking
 refresh();
+
+// Animate cards in after first data load
+const _animateDashboard = () => {
+  const kpiRow = document.querySelector('.kpi-row');
+  const dailyStrip = document.querySelector('.daily-strip');
+  const sessions = document.querySelector('.sessions');
+  if (kpiRow) staggerEntrance(kpiRow, 60, 80);
+  if (dailyStrip) setTimeout(() => { dailyStrip.classList.add('anim-card'); dailyStrip.style.animationDelay = '0ms'; }, 200);
+  if (sessions) setTimeout(() => staggerEntrance(sessions, 80), 300);
+};
+setTimeout(_animateDashboard, 200);
 </script>
 {% endblock %}

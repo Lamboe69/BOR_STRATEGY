@@ -658,6 +658,23 @@ select:focus {
       </div>
     </div>
 
+    <!-- Per-Symbol Configuration -->
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title-bar" style="background:linear-gradient(180deg,var(--purple),var(--amber))"></div>
+        <div class="panel-title">Per-Symbol Configuration</div>
+      </div>
+      <div class="panel-body" id="sym-config-body">
+        <div class="form-row">
+          <div>
+            <div class="form-label">Symbol Settings</div>
+            <div class="form-hint">Configure TP multiplier, minimum range, and retracement per symbol</div>
+          </div>
+          <div id="sym-config-list"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- Risk & Trade Parameters -->
     <div class="panel">
       <div class="panel-head">
@@ -682,10 +699,6 @@ select:focus {
         <div class="form-row">
           <div class="form-label">Max Trades per Session</div>
           <input type="number" id="max_trades_per_session" value="{{ settings.get('max_trades_per_session', 2) }}" min="1" max="10" step="1">
-        </div>
-        <div class="form-row">
-          <div class="form-label">TP Multiplier</div>
-          <input type="number" id="tp_multiplier" value="{{ settings.get('tp_multiplier', 10) }}" min="1" max="50" step="1">
         </div>
         <div class="form-row">
           <div>
@@ -773,6 +786,163 @@ select:focus {
       </div>
     </div>
 
+    <!-- Risk Management -->
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title-bar" style="background:linear-gradient(180deg,var(--red),var(--amber))"></div>
+        <div class="panel-title">Risk Management</div>
+      </div>
+      <div class="panel-body">
+        {% set rm = settings.get('risk_management', {}) %}
+        <div class="form-row">
+          <div>
+            <div class="form-label">Max Daily Loss (%)</div>
+            <div class="form-hint">Auto-stop trading when daily loss exceeds this %</div>
+          </div>
+          <input type="number" id="rm_max_daily_loss" value="{{ rm.get('max_daily_loss_pct', 5) }}" min="1" max="20" step="0.5">
+        </div>
+        <div class="form-row">
+          <div>
+            <div class="form-label">Consecutive Loss Limit</div>
+            <div class="form-hint">Pause after N consecutive losses</div>
+          </div>
+          <input type="number" id="rm_consecutive_losses" value="{{ rm.get('consecutive_loss_limit', 3) }}" min="1" max="10" step="1">
+        </div>
+        <div class="form-row">
+          <div>
+            <div class="form-label">Pause After Loss (min)</div>
+            <div class="form-hint">How long to pause after hitting consecutive loss limit</div>
+          </div>
+          <input type="number" id="rm_pause_minutes" value="{{ rm.get('pause_after_loss_minutes', 15) }}" min="1" max="120" step="5">
+        </div>
+        <div class="form-row">
+          <div>
+            <div class="form-label">Max Spread (pips)</div>
+            <div class="form-hint">Skip trades if spread exceeds this</div>
+          </div>
+          <input type="number" id="rm_max_spread" value="{{ rm.get('max_spread_pips', 50) }}" min="1" max="200" step="1">
+        </div>
+      </div>
+    </div>
+
+    <!-- H1 Trend Filter -->
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title-bar" style="background:linear-gradient(180deg,var(--cyan),var(--blue))"></div>
+        <div class="panel-title">H1 Trend Filter</div>
+      </div>
+      <div class="panel-body">
+        {% set h1 = settings.get('h1_trend_filter', {}) %}
+        <div class="form-row">
+          <div class="form-label">Enabled</div>
+          <label class="toggle">
+            <input type="checkbox" id="h1_enabled" {% if h1.get('enabled', True) %}checked{% endif %}>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="form-row">
+          <div>
+            <div class="form-label">Only Trade With Trend</div>
+            <div class="form-hint">If enabled, only take BUY in uptrend and SELL in downtrend</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="h1_trend_only" {% if h1.get('only_trade_with_trend', True) %}checked{% endif %}>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="form-row">
+          <div>
+            <div class="form-label">EMA Period</div>
+            <div class="form-hint">EMA used for trend detection</div>
+          </div>
+          <input type="number" id="h1_ema_period" value="{{ h1.get('ema_period', 20) }}" min="5" max="100" step="1">
+        </div>
+        <div class="form-row">
+          <div>
+            <div class="form-label">Lookback Candles</div>
+            <div class="form-hint">Number of H1 candles to analyze</div>
+          </div>
+          <input type="number" id="h1_lookback" value="{{ h1.get('lookback_candles', 24) }}" min="10" max="200" step="1">
+        </div>
+      </div>
+    </div>
+
+    <!-- Retracement Entry -->
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title-bar" style="background:linear-gradient(180deg,var(--amber),var(--red))"></div>
+        <div class="panel-title">Retracement Entry</div>
+      </div>
+      <div class="panel-body">
+        {% set rt = settings.get('retracement', {}) %}
+        <div class="form-row">
+          <div>
+            <div class="form-label">Enabled</div>
+            <div class="form-hint">Wait for retrace to entry level after breakout</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="rt_enabled" {% if rt.get('enabled', False) %}checked{% endif %}>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="form-row">
+          <div>
+            <div class="form-label">Max Wait Bars</div>
+            <div class="form-hint">Number of 15-min bars to wait before cancelling pending order</div>
+          </div>
+          <input type="number" id="rt_max_bars" value="{{ rt.get('max_wait_bars', 50) }}" min="1" max="200" step="1">
+        </div>
+        <div class="form-row">
+          <div>
+            <div class="form-label">Coverage Threshold (%)</div>
+            <div class="form-hint">Breakout candle must cover > this % of TP distance to trigger retrace mode</div>
+          </div>
+          <input type="number" id="rt_coverage" value="{{ rt.get('coverage_threshold', 15.0) }}" min="0" max="100" step="0.5">
+        </div>
+      </div>
+    </div>
+
+    <!-- Telegram Alerts -->
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title-bar" style="background:linear-gradient(180deg,var(--blue),var(--green))"></div>
+        <div class="panel-title">Telegram Alerts</div>
+      </div>
+      <div class="panel-body">
+        {% set tg = settings.get('telegram', {}) %}
+        <div class="form-row">
+          <div class="form-label">Enabled</div>
+          <label class="toggle">
+            <input type="checkbox" id="tg_enabled" {% if tg.get('enabled', False) %}checked{% endif %}>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="form-row">
+          <div>
+            <div class="form-label">Bot Token</div>
+            <div class="form-hint">From @BotFather on Telegram</div>
+          </div>
+          <input type="password" id="tg_token" value="{{ tg.get('bot_token', '') }}" placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11">
+        </div>
+        <div class="form-row">
+          <div>
+            <div class="form-label">Chat ID</div>
+            <div class="form-hint">Your Telegram user/group chat ID</div>
+          </div>
+          <input type="text" id="tg_chat_id" value="{{ tg.get('chat_id', '') }}" placeholder="-1001234567890">
+        </div>
+        <div class="form-row">
+          <div></div>
+          <div>
+            <button class="btn-add" onclick="testTelegram()" style="margin-top:8px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Test Telegram
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -783,6 +953,22 @@ select:focus {
 <script>
 let symbols = {{ settings.get('symbols', []) | tojson }};
 symbols = symbols.map(s => typeof s === 'object' ? s.name : s);
+
+let symbolsConfig = {{ settings.get('symbols_config', {}) | tojson }};
+
+// Fill default config for symbols that don't have one yet
+const _defaultConfig = {
+  tp_multiplier: {{ settings.get('tp_multiplier', 10) }},
+  min_range_points: {{ settings.get('min_range_points', 0) }},
+  retrace_enabled: null,
+  retrace_max_bars: {{ settings.get('retracement', {}).get('max_wait_bars', 50) }},
+  retrace_coverage_threshold: {{ settings.get('retracement', {}).get('coverage_threshold', 15.0) }}
+};
+symbols.forEach(s => {
+  if (!symbolsConfig[s]) {
+    symbolsConfig[s] = {..._defaultConfig};
+  }
+});
 
 let availableSymbols = [];
 
@@ -812,6 +998,62 @@ function renderSymbols() {
   document.getElementById('sym-list').innerHTML = symbols.map((s, i) =>
     `<span class="sym-tag">${s}<button onclick="removeSymbol(${i})">×</button></span>`
   ).join('');
+  renderSymbolConfig();
+}
+
+function renderSymbolConfig() {
+  const container = document.getElementById('sym-config-list');
+  if (symbols.length === 0) {
+    container.innerHTML = '<div style="color:var(--fg3); font-size:13px;">Add symbols above to configure per-symbol settings</div>';
+    return;
+  }
+  container.innerHTML = symbols.map(s => {
+    const cfg = symbolsConfig[s] || {..._defaultConfig};
+    const tp = cfg.tp_multiplier || _defaultConfig.tp_multiplier;
+    const mr = cfg.min_range_points != null ? cfg.min_range_points : _defaultConfig.min_range_points;
+    return `<div style="background:var(--bg2); border:1px solid var(--border); border-radius:14px; padding:18px; margin-bottom:12px;">
+      <div style="font-size:14px; font-weight:700; color:var(--fg); margin-bottom:14px; display:flex; align-items:center; gap:10px;">
+        <span style="width:8px;height:8px;border-radius:50%;background:var(--purple);display:inline-block;"></span>
+        ${s}
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px;">
+        <div>
+          <div style="font-size:10px; color:var(--fg2); text-transform:uppercase; letter-spacing:0.8px; margin-bottom:6px;">TP Multiplier</div>
+          <input type="number" data-sym="${s}" data-field="tp_multiplier" value="${tp}" min="1" max="50" step="1" style="width:100%; padding:10px 14px; border-radius:10px; background:var(--bg); border:1px solid var(--border); color:var(--fg); font-family:'JetBrains Mono',monospace; font-size:13px; outline:none;">
+        </div>
+        <div>
+          <div style="font-size:10px; color:var(--fg2); text-transform:uppercase; letter-spacing:0.8px; margin-bottom:6px;">Min Range Points</div>
+          <input type="number" data-sym="${s}" data-field="min_range_points" value="${mr}" min="0" step="0.0001" style="width:100%; padding:10px 14px; border-radius:10px; background:var(--bg); border:1px solid var(--border); color:var(--fg); font-family:'JetBrains Mono',monospace; font-size:13px; outline:none;">
+        </div>
+        <div>
+          <div style="font-size:10px; color:var(--fg2); text-transform:uppercase; letter-spacing:0.8px; margin-bottom:6px;">Retrace</div>
+          <select data-sym="${s}" data-field="retrace_enabled" style="width:100%; padding:10px 14px; border-radius:10px; background:var(--bg); border:1px solid var(--border); color:var(--fg); font-family:'JetBrains Mono',monospace; font-size:13px; outline:none;">
+            <option value="" ${cfg.retrace_enabled == null ? 'selected' : ''}>Global default</option>
+            <option value="true" ${cfg.retrace_enabled === true ? 'selected' : ''}>Enabled</option>
+            <option value="false" ${cfg.retrace_enabled === false ? 'selected' : ''}>Disabled</option>
+          </select>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Wire up change listeners to update symbolsConfig
+  container.querySelectorAll('input[data-sym], select[data-sym]').forEach(el => {
+    el.addEventListener('change', function() {
+      const sym = this.dataset.sym;
+      const field = this.dataset.field;
+      if (!symbolsConfig[sym]) symbolsConfig[sym] = {..._defaultConfig};
+      if (this.type === 'checkbox') {
+        symbolsConfig[sym][field] = this.checked;
+      } else if (this.tagName === 'SELECT' && this.value === '') {
+        symbolsConfig[sym][field] = null;
+      } else if (this.tagName === 'SELECT') {
+        symbolsConfig[sym][field] = this.value === 'true';
+      } else {
+        symbolsConfig[sym][field] = parseFloat(this.value);
+      }
+    });
+  });
 }
 
 function addSymbol() {
@@ -840,6 +1082,7 @@ function addSymbol() {
 function removeSymbol(i) {
   const removed = symbols[i];
   symbols.splice(i, 1);
+  delete symbolsConfig[removed];
   renderSymbols();
   toast(`🗑️ Removed ${removed} — Don't forget to Save!`, false);
   highlightSaveButton();
@@ -854,6 +1097,20 @@ function highlightSaveButton() {
 }
 
 async function saveSettings() {
+  // Read per-symbol config from the rendered inputs
+  const scKeys = Object.keys(symbolsConfig);
+  const symConfigData = {};
+  scKeys.forEach(sym => {
+    const cfg = symbolsConfig[sym] || {};
+    const entry = {};
+    if (cfg.tp_multiplier != null) entry.tp_multiplier = parseFloat(cfg.tp_multiplier) || 10;
+    if (cfg.min_range_points != null) entry.min_range_points = parseFloat(cfg.min_range_points) || 0;
+    if (cfg.retrace_enabled != null) entry.retrace_enabled = cfg.retrace_enabled;
+    if (cfg.retrace_max_bars != null) entry.retrace_max_bars = parseInt(cfg.retrace_max_bars) || 50;
+    if (cfg.retrace_coverage_threshold != null) entry.retrace_coverage_threshold = parseFloat(cfg.retrace_coverage_threshold) || 15;
+    symConfigData[sym] = entry;
+  });
+
   const data = {
     mt5_login: document.getElementById('mt5_login').value.trim(),
     mt5_password: document.getElementById('mt5_password').value,
@@ -863,8 +1120,7 @@ async function saveSettings() {
     initial_balance: parseFloat(document.getElementById('initial_balance').value) || 10000,
     risk_pct: parseFloat(document.getElementById('risk_pct').value) || 1.0,
     max_trades_per_session: parseInt(document.getElementById('max_trades_per_session').value) || 2,
-    tp_multiplier: parseInt(document.getElementById('tp_multiplier').value) || 10,
-    poll_interval: parseInt(document.getElementById('poll_interval').value) || 10,
+    poll_interval: parseInt(document.getElementById('poll_interval').value) || 1,
     timezone_offset: parseInt(document.getElementById('timezone_offset').value) || 0,
     sessions: {
       tokyo: {
@@ -877,11 +1133,34 @@ async function saveSettings() {
         start: document.getElementById('ldn-start').value,
         end: document.getElementById('ldn-end').value
       }
+    },
+    symbols_config: symConfigData,
+    retracement: {
+      enabled: document.getElementById('rt_enabled').checked,
+      max_wait_bars: parseInt(document.getElementById('rt_max_bars').value) || 50,
+      coverage_threshold: parseFloat(document.getElementById('rt_coverage').value) || 15.0
+    },
+    risk_management: {
+      max_daily_loss_pct: parseFloat(document.getElementById('rm_max_daily_loss').value) || 5,
+      consecutive_loss_limit: parseInt(document.getElementById('rm_consecutive_losses').value) || 3,
+      pause_after_loss_minutes: parseInt(document.getElementById('rm_pause_minutes').value) || 15,
+      max_spread_pips: parseInt(document.getElementById('rm_max_spread').value) || 50
+    },
+    h1_trend_filter: {
+      enabled: document.getElementById('h1_enabled').checked,
+      only_trade_with_trend: document.getElementById('h1_trend_only').checked,
+      ema_period: parseInt(document.getElementById('h1_ema_period').value) || 20,
+      lookback_candles: parseInt(document.getElementById('h1_lookback').value) || 24
+    },
+    telegram: {
+      enabled: document.getElementById('tg_enabled').checked,
+      bot_token: document.getElementById('tg_token').value.trim(),
+      chat_id: document.getElementById('tg_chat_id').value.trim()
     }
   };
 
   try {
-    const r = await fetch('/settings', {
+    const r = await fetch('/bot/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
@@ -889,16 +1168,26 @@ async function saveSettings() {
     const j = await r.json();
     
     if (j.ok) {
-      if (j.restarted) {
-        toast('✅ Settings saved & bot restarted with new configuration', false);
-      } else {
-        toast('✅ Settings saved successfully', false);
-      }
+      toast('✅ Settings saved', false);
     } else {
       toast('❌ ' + (j.msg || 'Failed to save'), true);
     }
   } catch (e) {
-    toast('❌ Network error. Please try again.', true);
+    toast('❌ Network error', true);
+  }
+}
+
+async function testTelegram() {
+  try {
+    const r = await fetch('/bot/telegram-test', { method: 'POST' });
+    const j = await r.json();
+    if (j.ok) {
+      toast('✅ Test message sent! Check Telegram', false);
+    } else {
+      toast('❌ ' + (j.msg || 'Telegram test failed'), true);
+    }
+  } catch (e) {
+    toast('❌ Network error', true);
   }
 }
 

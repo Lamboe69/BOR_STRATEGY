@@ -108,18 +108,31 @@ class BORStrategy:
     def __init__(self, symbol: str, risk_pct: float, account_balance_fn,
                  max_trades: int = 2, tp_mult: float = 10.0,
                  tokyo_start=(0, 0),  tokyo_end=(9, 0),
-                 london_start=(7, 0), london_end=(16, 0)):
+                 london_start=(7, 0), london_end=(16, 0),
+                 min_range_points: float = 0.0,
+                 min_stop_distance: float = 0.0,
+                 retrace_enabled: bool = True,
+                 retrace_max_bars: int = 50,
+                 retrace_coverage_threshold: float = 0.0):
         self.symbol      = symbol
         self.risk_pct    = risk_pct
         self.get_balance = account_balance_fn
         self.max_trades  = max_trades
         self.tp_mult     = tp_mult
+        self.min_range_points = min_range_points
+        self.min_stop_distance = min_stop_distance
+        self.retrace_enabled = retrace_enabled
+        self.retrace_max_bars = retrace_max_bars
+        self.retrace_coverage_threshold = retrace_coverage_threshold
 
         self.tokyo  = SessionState("tokyo",  tokyo_start,  tokyo_end)
         self.london = SessionState("london", london_start, london_end)
 
         # ── global trade slot (Pine: single tr_active across all sessions) ──
         self.active_trade: Optional[Trade] = None
+
+        # ── pending order (retrace entry) ──
+        self.pending_order: Optional[dict] = None
 
         # ── global wick-out state (Pine: tr_wicked_out / tr_prev_entry / tr_prev_is_buy) ──
         self.wicked_out:      bool  = False
@@ -175,18 +188,37 @@ class BORStrategy:
         # ── session open: snapshot levels + reset session state ───────────
         # Pine resets tr_wicked_out on each session open
         if tky_in and not self.tokyo.initialized:
-            self.tokyo.reset()
-            s1, s2, s3, s4 = sort4(pre_h, pre_l, open_h, open_l)
-            self.tokyo.levels     = BORLevels(s1, s2, s3, s4)
-            self.tokyo.initialized = True
-            self.wicked_out = False   # Pine: tr_wicked_out := false on session open
+            cur_min = utc_dt.hour * 60 + utc_dt.minute
+            ses_min = self.tokyo.start[0] * 60 + self.tokyo.start[1]
+            if cur_min == ses_min:
+                # First candle of session — defer level computation to next candle
+                # so levels are computed from (session_start, session_start+15min),
+                # matching the backtest (which processes bars[1] with bars[0] as pre)
+                self.tokyo.levels = BORLevels()  # Invalidate old levels
+                self.tokyo.trade_count = 0
+                self.tokyo.won = False
+                self.wicked_out = False
+            else:
+                self.tokyo.reset()
+                s1, s2, s3, s4 = sort4(pre_h, pre_l, open_h, open_l)
+                self.tokyo.levels     = BORLevels(s1, s2, s3, s4)
+                self.tokyo.initialized = True
+                self.wicked_out = False
 
         if ldn_in and not self.london.initialized:
-            self.london.reset()
-            s1, s2, s3, s4 = sort4(pre_h, pre_l, open_h, open_l)
-            self.london.levels     = BORLevels(s1, s2, s3, s4)
-            self.london.initialized = True
-            self.wicked_out = False   # Pine: tr_wicked_out := false on session open
+            cur_min = utc_dt.hour * 60 + utc_dt.minute
+            ses_min = self.london.start[0] * 60 + self.london.start[1]
+            if cur_min == ses_min:
+                self.london.levels = BORLevels()
+                self.london.trade_count = 0
+                self.london.won = False
+                self.wicked_out = False
+            else:
+                self.london.reset()
+                s1, s2, s3, s4 = sort4(pre_h, pre_l, open_h, open_l)
+                self.london.levels     = BORLevels(s1, s2, s3, s4)
+                self.london.initialized = True
+                self.wicked_out = False
 
         # ── check active trade outcome ────────────────────────────────────
         if self.active_trade and not self.active_trade.closed:
@@ -205,24 +237,69 @@ class BORStrategy:
                                    else close > t.sl)
                 self.wicked_out  = not body_closed_out
                 # Store previous SL (not entry) for wick-out filter
-                self.prev_entry  = t.sl  # Changed: store SL instead of entry
+                self.prev_entry  = t.sl
                 self.prev_is_buy = (t.direction == "buy")
                 self._close_trade(ses, t.sl, utc_dt, reason="sl")
             elif not ses_still_active:
                 # Session ended with trade still open — close at market
                 self._close_trade(ses, close, utc_dt, reason="session_end")
 
+        # ── check pending retrace order ──────────────────────────────────
+        if self.pending_order is not None:
+            po = self.pending_order
+            po["wait_bars"] += 1
+
+            po_session_active = (
+                (po["session"] == "tokyo" and tky_in and not ldn_in) or
+                (po["session"] == "london" and ldn_in)
+            )
+
+            if po["wait_bars"] > self.retrace_max_bars:
+                self.pending_order = None
+            elif not po_session_active:
+                self.pending_order = None
+            else:
+                tp_hit = (high >= po["tp"] if po["direction"] == "buy"
+                          else low <= po["tp"])
+                if tp_hit:
+                    self.pending_order = None
+                else:
+                    retraced = (low <= po["entry"] if po["direction"] == "buy"
+                                else high >= po["entry"])
+                    if retraced:
+                        ses = self.tokyo if po["session"] == "tokyo" else self.london
+                        trade = Trade(
+                            symbol=self.symbol, session=po["session"],
+                            direction=po["direction"], entry=po["entry"],
+                            sl=po["sl"], tp=po["tp"],
+                            lot_size=po["lot_size"], open_time=utc_dt,
+                        )
+                        self.active_trade = trade
+                        ses.trade_count += 1
+                        self.pending_order = None
+                        signals.append({
+                            "symbol":    self.symbol,
+                            "session":   po["session"],
+                            "direction": po["direction"],
+                            "entry":     po["entry"],
+                            "sl":        po["sl"],
+                            "tp":        po["tp"],
+                            "lot_size":  po["lot_size"],
+                            "time":      utc_dt,
+                            "entry_type": "LIMIT",
+                        })
+
         # ── signal detection ──────────────────────────────────────────────
-        # Pine: only one trade active globally
         if self.active_trade and not self.active_trade.closed:
+            return signals
+        if self.pending_order is not None:
             return signals
 
         # Global wick-out filter (Pine: _wko_buy_ok / _wko_sell_ok)
-        # After wick-out, require close beyond previous SL (not just entry)
         wko_buy_ok  = (not (self.wicked_out and self.prev_is_buy)
-                       or close > self.prev_entry)  # prev_entry stores prev SL for wick-out
+                       or close > self.prev_entry)
         wko_sell_ok = (not (self.wicked_out and not self.prev_is_buy)
-                       or close < self.prev_entry)  # prev_entry stores prev SL for wick-out
+                       or close < self.prev_entry)
 
         for ses, ses_in in ((self.tokyo, tky_in), (self.london, ldn_in)):
             if not ses_in:
@@ -233,7 +310,12 @@ class BORStrategy:
             if ses.won or ses.trade_count >= self.max_trades:
                 continue
 
-            # Breakout conditions — close crosses s1/s4 (Pine: close > tky_top / close < tky_bot)
+            # Range filter: skip if S1-S4 range is too tight
+            total_range = lvl.s1 - lvl.s4
+            if self.min_range_points > 0 and total_range < self.min_range_points:
+                continue
+
+            # Breakout conditions
             buy_signal  = (close > lvl.s1 and prev_close <= lvl.s1 and wko_buy_ok)
             sell_signal = (close < lvl.s4 and prev_close >= lvl.s4 and wko_sell_ok)
 
@@ -243,29 +325,53 @@ class BORStrategy:
             direction = "buy" if buy_signal else "sell"
             entry = lvl.s1 if buy_signal else lvl.s4
             sl    = lvl.s2 if buy_signal else lvl.s3
+            # Enforce broker minimum stop distance (0 = no enforcement)
+            if self.min_stop_distance > 0:
+                if direction == "buy":
+                    sl = max(sl, entry - self.min_stop_distance)
+                else:
+                    sl = min(sl, entry + self.min_stop_distance)
             tp    = (entry + abs(entry - sl) * self.tp_mult if buy_signal
                      else entry - abs(sl - entry) * self.tp_mult)
 
             lot = self._calc_lot(entry, sl)
-            trade = Trade(
-                symbol=self.symbol, session=ses.name,  # ← Trade belongs to session where it was OPENED
-                direction=direction, entry=entry, sl=sl, tp=tp,
-                lot_size=lot, open_time=utc_dt,
-            )
-            self.active_trade = trade
-            ses.trade_count  += 1  # ← Increment count for the OPENING session
 
-            signals.append({
-                "symbol":    self.symbol,
-                "session":   ses.name,  # ← Signal tagged with OPENING session
-                "direction": direction,
-                "entry":     entry,
-                "sl":        sl,
-                "tp":        tp,
-                "lot_size":  lot,
-                "time":      utc_dt,
-            })
-            break  # Pine: only one signal per candle (single global slot)
+            # Check how much the breakout candle covered of TP distance
+            total_tp_distance = abs(tp - entry)
+            distance_covered = (close - entry) if buy_signal else (entry - close)
+            tp_coverage_pct = (distance_covered / total_tp_distance * 100) if total_tp_distance > 0 else 0
+
+            if self.retrace_enabled and tp_coverage_pct > self.retrace_coverage_threshold:
+                self.pending_order = {
+                    "direction": direction,
+                    "entry": entry,
+                    "sl": sl,
+                    "tp": tp,
+                    "lot_size": lot,
+                    "session": ses.name,
+                    "wait_bars": 0,
+                }
+            else:
+                trade = Trade(
+                    symbol=self.symbol, session=ses.name,
+                    direction=direction, entry=entry, sl=sl, tp=tp,
+                    lot_size=lot, open_time=utc_dt,
+                )
+                self.active_trade = trade
+                ses.trade_count  += 1
+
+                signals.append({
+                    "symbol":    self.symbol,
+                    "session":   ses.name,
+                    "direction": direction,
+                    "entry":     entry,
+                    "sl":        sl,
+                    "tp":        tp,
+                    "lot_size":  lot,
+                    "time":      utc_dt,
+                    "entry_type": "MARKET",
+                })
+            break  # one signal per candle
 
         return signals
 

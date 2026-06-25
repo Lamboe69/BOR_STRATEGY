@@ -226,6 +226,8 @@
         min-width: 0;
         margin-left: var(--sidebar-w);
         transition: margin-left 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+        position: relative;
+        z-index: 1;
     }
 
     /* ── TOPBAR ── */
@@ -341,6 +343,50 @@
     .sidebar-overlay.open {
         display: block;
         opacity: 1;
+    }
+
+    /* ── AMBIENT GLOW ── */
+    .ambient-glow {
+        position: fixed;
+        top: 40%;
+        left: 50%;
+        width: 900px;
+        height: 900px;
+        transform: translate(-50%, -50%);
+        background: radial-gradient(circle, rgba(168, 85, 247, 0.07) 0%, rgba(59, 130, 246, 0.03) 40%, transparent 70%);
+        pointer-events: none;
+        z-index: 0;
+        animation: ambientPulse 10s ease-in-out infinite alternate;
+    }
+
+    @keyframes ambientPulse {
+        0%   { transform: translate(-50%, -50%) scale(1); opacity: 0.6; }
+        100% { transform: translate(-50%, -50%) scale(1.4); opacity: 1; }
+    }
+
+    /* ── MOTION KEYFRAMES ── */
+    @keyframes fadeSlideIn {
+        from { opacity: 0; transform: translateY(24px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to   { opacity: 1; }
+    }
+
+    @keyframes valueFlash {
+        0%   { background: rgba(168, 85, 247, 0.15); transform: scale(1.05); }
+        100% { background: transparent; transform: scale(1); }
+    }
+
+    .anim-card {
+        opacity: 0;
+        animation: fadeSlideIn 0.5s ease-out forwards;
+    }
+
+    .anim-flash {
+        animation: valueFlash 0.6s ease-out;
     }
 
     /* ── RESPONSIVE ── */
@@ -539,6 +585,9 @@
     <!-- Sidebar Overlay -->
     <div class="sidebar-overlay" id="sb-overlay" onclick="closeSidebar()"></div>
 
+    <!-- Ambient Glow -->
+    <div class="ambient-glow"></div>
+
     <!-- MAIN AREA -->
     <div class="main-area">
         <header class="topbar">
@@ -661,6 +710,56 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/static/sw.js')
         .then(reg => console.log('Service Worker registered'))
         .catch(err => console.log('Service Worker registration failed'));
+}
+
+// ── ANIMATION UTILITIES ──
+
+/** Animate a number element from old value to new value */
+function animateValue(el, start, end, decimals = 0, duration = 700) {
+    if (start === end) return;
+    const range = end - start;
+    const startTime = performance.now();
+    function step(now) {
+        const p = Math.min((now - startTime) / duration, 1);
+        const eased = p === 1 ? 1 : 1 - Math.pow(2, -10 * p); // easeOutExpo
+        const val = start + range * eased;
+        el.textContent = val.toFixed(decimals);
+        if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+}
+
+/** Animate a formatted dollar value */
+function animateMoney(el, start, end, duration = 700) {
+    if (start === end) return;
+    const range = end - start;
+    const startTime = performance.now();
+    const isNeg = end < 0;
+    function step(now) {
+        const p = Math.min((now - startTime) / duration, 1);
+        const eased = p === 1 ? 1 : 1 - Math.pow(2, -10 * p);
+        const val = start + range * eased;
+        const prefix = val >= 0 ? '+$' : '-$';
+        el.textContent = prefix + Math.abs(val).toFixed(2);
+        if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+}
+
+/** Apply staggered entrance animation to child elements */
+function staggerEntrance(parent, delay = 80, baseDelay = 50) {
+    const kids = parent.children;
+    for (let i = 0; i < kids.length; i++) {
+        kids[i].style.animationDelay = (baseDelay + i * delay) + 'ms';
+        kids[i].classList.add('anim-card');
+    }
+}
+
+/** Flash a value element briefly to indicate an update */
+function flashEl(el) {
+    el.classList.remove('anim-flash');
+    void el.offsetWidth; // reflow
+    el.classList.add('anim-flash');
 }
 </script>
 
