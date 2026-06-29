@@ -705,6 +705,9 @@ def backtest_symbols():
         password = cfg.get("mt5_password", "")
         server   = cfg.get("mt5_server", "")
         kwargs   = {"login": login, "password": password, "server": server}
+        mt5_path = cfg.get("mt5_path", "")
+        if mt5_path:
+            kwargs["path"] = mt5_path
         if not mt5.initialize(**kwargs):
             return jsonify({"symbols": fallback, "source": "settings"})
         syms = mt5.symbols_get()
@@ -800,6 +803,9 @@ def backtest_run():
         password = cfg.get("mt5_password", "")
         server   = cfg.get("mt5_server", "")
         kwargs   = {"login": login, "password": password, "server": server}
+        mt5_path = cfg.get("mt5_path", "")
+        if mt5_path:
+            kwargs["path"] = mt5_path
 
         if not mt5.initialize(**kwargs):
             error = mt5.last_error()

@@ -1160,6 +1160,7 @@ async function saveSettings() {
   };
 
   try {
+    // Save settings first
     const r = await fetch('/bot/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1167,10 +1168,22 @@ async function saveSettings() {
     });
     const j = await r.json();
     
-    if (j.ok) {
-      toast('✅ Settings saved', false);
-    } else {
+    if (!j.ok) {
       toast('❌ ' + (j.msg || 'Failed to save'), true);
+      return;
+    }
+    
+    // Restart bot to apply new settings
+    toast('🔄 Settings saved, restarting bot...', false);
+    await fetch('/bot/stop', { method: 'POST' });
+    // Small delay for cleanup
+    await new Promise(r => setTimeout(r, 2000));
+    const startR = await fetch('/bot/start', { method: 'POST' });
+    const startJ = await startR.json();
+    if (startJ.ok) {
+      toast('✅ Settings saved & bot restarted', false);
+    } else {
+      toast('⚠️ Settings saved but bot restart failed: ' + (startJ.msg || ''), true);
     }
   } catch (e) {
     toast('❌ Network error', true);
